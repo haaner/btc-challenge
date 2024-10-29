@@ -1,0 +1,38 @@
+0100000001a4e61ed60e66af9f7ca4f2eb25234f6e32e0cb8f6099db21a2462c42de61640b010000006b483045022100c233c3a8a510e03ad18b0a24694ef00c78101bfd5ac075b8c1037952ce26e91e02205aa5f8f88f29bb4ad5808ebc12abfd26bd791256f367b04c6d955f01f28a7724012103f0609c81a45f8cab67fc2d050c21b1acd3d37c7acfd54041be6601ab4cef4f31feffffff02f9243751130000001976a9140c443537e6e31f06e6edb2d4bb80f8481e2831ac88ac14206c00000000001976a914d807ded709af8893f02cdc30a37994429fa248ca88ac751a0600
+
+---========= ++++++++++++++++++ =========---
+
+01000000
+
+01
+
+a4e61ed60e66af9f7ca4f2eb25234f6e32e0cb8f6099db21a2462c42de61640b // previous transaction id
+01000000 // vout of the previous transaction
+6b // scriptSig length // varint
+48 // OP_PUSHBYTES_72
+3045022100c233c3a8a510e03ad18b0a24694ef00c78101bfd5ac075b8c1037952ce26e91e02205aa5f8f88f29bb4ad5808ebc12abfd26bd791256f367b04c6d955f01f28a772401
+21 // OP_PUSHBYTES_33 // length of the public key of the originating trx-vout // 1 byte 
+03f0609c81a45f8cab67fc2d050c21b1acd3d37c7acfd54041be6601ab4cef4f31 // public key of the originating trx-vout
+feffffff
+
+02 // two P2SH outputs
+f924375113000000 // amount
+19 // varint // 0x19 = 25 = 3 + 20 + 2
+76 // OP_DUP
+a9 // OP_HASH160 
+14 // OP_PUSHBYTES_20
+0c443537e6e31f06e6edb2d4bb80f8481e2831ac // pubkeyHash160
+88 // OP_EQUALVERIFY
+ac // OP_CHECKSIG
+
+14206c0000000000 // amount
+19 // varint // 0x19 = 25 = 3 + 20 + 2
+76 // OP_DUP
+a9 // OP_HASH160 
+14 // OP_PUSHBYTES_20
+d807ded709af8893f02cdc30a37994429fa248ca // pubkeyHash160
+88 // OP_EQUALVERIFY
+ac // OP_CHECKSIG
+751a0600 // locktime
+
+---========= ++++++++++++++++++ =========---
