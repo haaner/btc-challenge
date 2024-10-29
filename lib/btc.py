@@ -58,14 +58,14 @@ def compute_pubkey_address(pubkey: str) -> str:
     
 def compress_pubkey(pubkey: str) -> str:
 
-    # Checking if the last byte is odd or even
+    # check if the last byte is odd or even
     if (ord(bytearray.fromhex(pubkey[-2:])) % 2 == 0):
         public_key_compressed = '02'
     else:
         public_key_compressed = '03'
         
-    # Add bytes 0x02 to the X of the key if even or 0x03 if odd
-    public_key_compressed += pubkey[2:66]
+    # add the 32 bytes of the x-coord
+    public_key_compressed += pubkey[:64]
 
     return public_key_compressed
 
@@ -101,40 +101,18 @@ if len(privkey) != 64: # 64 chars is hex
 ####
 
 privkey_int = int(privkey, 16)
-x, y = scalar_mult(privkey_int, curve.g)
 
-x_hex = hex(x)
-y_hex = hex(y) 
+x, y = scalar_mult(privkey_int, curve.g) # or use: ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
 
-# Bitcoin public key begins with bytes 0x04 
-pubkey = '04' + x_hex[2:] + y_hex[2:]
+#print("\nCoords of the public key:", (x, y))
 
-'''
-# Hex decoding the private key to binary using codecs library
-privkey_bin = codecs.decode(privkey, 'hex') 
+x_hex = hex(x)[2:]
+y_hex = hex(y)[2:] 
 
-# Generating a public key in bytes using SECP256k1 & ecdsa library
-pubkey_raw = ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
-pubkey_bin = pubkey_raw.to_string()
+pubkey = x_hex + y_hex
 
-# Hex encoding the public key from binary
-pubkey_hex = codecs.encode(pubkey_bin, 'hex')
-                               
-# Bitcoin public key begins with bytes 0x04 so we have to add the bytes at the start
-pubkey = (b'04' + pubkey_hex).decode("utf-8")
-
-point = pubkey[2:]
-x = point[:64]
-y = point[64:]
-
-print(f"{x=}")
-print(f"{y=}")
-'''
-
-print("\nHex'd public key:", pubkey, "\n")
-
-pubkey_address_uncompressed = compute_pubkey_address(pubkey)
-print(f'{pubkey_address_uncompressed=}')
+pubkey_address_uncompressed = compute_pubkey_address('04' + pubkey) 
+print(f"\n{pubkey_address_uncompressed=}")
 
 pubkey_compressed = compress_pubkey(pubkey)
 pubkey_address_compressed = compute_pubkey_address(pubkey_compressed)
