@@ -1,37 +1,95 @@
----=== transaction format ===---
+---========= transaction format =========---
 
 02000000 // version // 4 bytes
 [ 00 01 ] // optional segregated witness marker + flag // 2 bytes 
 02 // inputs // varint -> 1, 3, 5 or 9 bytes - normally 1 byte as long as #inputs <= FC == 252
-05b3c267698917d42b4fae0b97997f5cce5c68a15f78365990dcc5d64d0ccfa3 // prev transaction id (little-endian) // 32 bytes
+55a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af // prev transaction id (little-endian) // 32 bytes
 00000000 // vout of the previous transaction (little-endian) // 4 bytes
-00 // script sig size // varint -> 1, 3, 5 or 9 bytes 
+XX // scriptSig size // varint
 <scriptSig>
 ffffffff // sequence (locktime + RBF) // 4 bytes
 ... // second input
 02 // outputs // varint
 00e2040000000000 // amount to spend // 8 bytes
+19 // 2 + size of YY + YY + 2 // varint
 76 // OP_DUP 
 a9 // OP_HASH160 
+14 // pubkeyHash160 size (YY) // varint  
 <pubkeyHash160> // bytes 3-42 of the base58-decoded and hex-encoded pubkey
 88 // OP_EQUALVERIFY
 ac // OP_CHECKSIG
+... // second output
+00000000 // locktime // 4 bytes
+
+---========= ++++++++++++++++++ =========---
+
+big-endian txid -> little-endian: echo af76a8c5f315d20024166c28bdd48aed17e04c6fca330f6698e45e9f1736a755 | tac -rs ..
+
+Spent 320000 satoshis => in little-endian byte encoding: $ python3 -c 'print(int.to_bytes(320000, 8, "little").hex())' => 00e2040000000000
+Spent 52000 satoshis => in little-endian byte encoding: $ python3 -c 'print(int.to_bytes(52000, 8, "little").hex())' => 20cb000000000000
+
+Using lib/btc.py: 
+
+>> print(wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk')) => e993470936b573678dc3b997e56db2f9983cb0b4
+>> print(wifToHash160('mxFEHeSxxKjy9YcmFzXNpuE3FFJyby56jA')) => b780d54c6b03b053916333b50a213d566bbedd13
+
+--------------------------------
+
+02000000
+02
+55a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af 00000000 00 <scriptSig> ffffffff 
+4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092 02000000 00 <scriptSig> ffffffff 
+02
+00e2040000000000 19 76a9 14 e993470936b573678dc3b997e56db2f9983cb0b4 88ac
+20cb000000000000 19 76a9 14 b780d54c6b03b053916333b50a213d566bbedd13 88ac
+00000000
 
 --------------------------------
 
 mgWqtfrTjQ5y7GMLH8aHAdsPTwMm7sg3Tq / 02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459 / 514321CFA3C255BE2CE8249A70267B9D2935B7DC5B36055BA158D5F00C645F83
 mra9JYc7m4FriFeUNsEwKdcPRgSv82LoRz / 0333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BA / E899BE5310DE3BFE856548AE0F8910C4D6DFC2505A8722A7151CF8FBBEB71D57
 
-big-endian txid -> little-endian: echo af76a8c5f315d20024166c28bdd48aed17e04c6fca330f6698e45e9f1736a755 | tac -rs ..
+Conversion of private keys HEX -> DER -> PEM:
 
-Spent 320000 satoshis => in little-endian byte encoding: $ python3 -c 'print(int.to_bytes(320000, 8, "little").hex())' => 00e2040000000000
+$ echo 302e0201010420 514321CFA3C255BE2CE8249A70267B9D2935B7DC5B36055BA158D5F00C645F83 a00706052b8104000a | xxd -p -r > priv1_der.key
+$ echo 302e0201010420 E899BE5310DE3BFE856548AE0F8910C4D6DFC2505A8722A7151CF8FBBEB71D57 a00706052b8104000a | xxd -p -r > priv2_der.key
 
+$ openssl ec -inform d < priv1_der.key > priv1_pem.key
+$ openssl ec -inform d < priv2_der.key > priv2_pem.key
+
+( Show DER-Key as text: $ openssl ec -noout -text -inform d -in priv1_der.key )
+( Show PEM-Key as text: $ openssl ec -noout -text -inform p -in priv1_pem.key )
+
+[ See: https://bitcointalk.org/index.php?topic=5230931.msg53981752#msg53981752 ]
 
 --------------------------------
 
-020000000205b3c267698917d42b4fae0b97997f5cce5c68a15f78365990dcc5d64d0ccfa3000000 00 <scriptSig> ffffffff 
-4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092 02000000 00 <scriptSig> ffffffff 
-00e2040000000000 76 a9 <pubkeyHash> 88 ac
+Create the first message to sign:
 
- 
+- Replace the first scriptSig and the leading size byte
+- Remove the second scriptSig and leave its size equal to 0
+- Finally add the 01000000 SIGHASH_ALL sequence add the end
+- Double SHA256 the binary representation and use this as the first message to be signed
 
+$ echo "
+02000000
+02
+55a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af 00000000 19 76a9 14 0af2c7db949861cdc7767ad211432789f1852e9488ac ffffffff 
+4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092 02000000 00 ffffffff
+02
+00e2040000000000 19 76a9 14 e993470936b573678dc3b997e56db2f9983cb0b4 88ac
+20cb000000000000 19 76a9 14 b780d54c6b03b053916333b50a213d566bbedd13 88ac
+00000000
+01000000" | tr -d '\n ' | xxd -p -r | sha256sum -b | xxd -p -r | sha256sum -b | xxd -p -r > first.msg
+
+
+
+
+# the signing process 
+#  prepare pubkey:
+    openssl ec -in privkey.pem -pubout -out pubkey.pem
+#  sign:
+    openssl dgst -sign privkey.pem  -sha256 -hex tmp_utx.hex
+    openssl dgst -sign privkey.pem  -sha256 tmp_utx.hex > tmp_sig.hex
+#  verify:
+    openssl dgst -verify pubkey.pem -sha256 -signature tmp_sig.hex tmp_utx.hex
