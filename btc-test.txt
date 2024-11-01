@@ -1,0 +1,37 @@
+---=== transaction format ===---
+
+02000000 // version // 4 bytes
+[ 00 01 ] // optional segregated witness marker + flag // 2 bytes 
+02 // inputs // varint -> 1, 3, 5 or 9 bytes - normally 1 byte as long as #inputs <= FC == 252
+05b3c267698917d42b4fae0b97997f5cce5c68a15f78365990dcc5d64d0ccfa3 // prev transaction id (little-endian) // 32 bytes
+00000000 // vout of the previous transaction (little-endian) // 4 bytes
+00 // script sig size // varint -> 1, 3, 5 or 9 bytes 
+<scriptSig>
+ffffffff // sequence (locktime + RBF) // 4 bytes
+... // second input
+02 // outputs // varint
+00e2040000000000 // amount to spend // 8 bytes
+76 // OP_DUP 
+a9 // OP_HASH160 
+<pubkeyHash160> // bytes 3-42 of the base58-decoded and hex-encoded pubkey
+88 // OP_EQUALVERIFY
+ac // OP_CHECKSIG
+
+--------------------------------
+
+mgWqtfrTjQ5y7GMLH8aHAdsPTwMm7sg3Tq / 02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459 / 514321CFA3C255BE2CE8249A70267B9D2935B7DC5B36055BA158D5F00C645F83
+mra9JYc7m4FriFeUNsEwKdcPRgSv82LoRz / 0333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BA / E899BE5310DE3BFE856548AE0F8910C4D6DFC2505A8722A7151CF8FBBEB71D57
+
+big-endian txid -> little-endian: echo af76a8c5f315d20024166c28bdd48aed17e04c6fca330f6698e45e9f1736a755 | tac -rs ..
+
+Spent 320000 satoshis => in little-endian byte encoding: $ python3 -c 'print(int.to_bytes(320000, 8, "little").hex())' => 00e2040000000000
+
+
+--------------------------------
+
+020000000205b3c267698917d42b4fae0b97997f5cce5c68a15f78365990dcc5d64d0ccfa3000000 00 <scriptSig> ffffffff 
+4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092 02000000 00 <scriptSig> ffffffff 
+00e2040000000000 76 a9 <pubkeyHash> 88 ac
+
+ 
+

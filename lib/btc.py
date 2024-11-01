@@ -69,51 +69,64 @@ def compress_pubkey(pubkey: str) -> str:
 
     return public_key_compressed
 
-####################################################################################
+def privateHexKeyToWif(privkey_hex: str, compress: bool = True, mainnet = True) -> str:
 
-#privkey = "18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725"
-privkey = "L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC"
-#privkey = "5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm"
+    if mainnet: variant = '80' 
+    else: variant = 'ef'
+    
+    privkey_hex = variant + privkey_hex
+    
+    if compress: privkey_hex += '01'
 
-if len(privkey) != 64: # 64 chars is hex
-    privkey_wif_uncompressed = uncompress_privkey(privkey)
+    privkey_bytes = bytes(bytearray(privkey_hex, 'ascii'))
 
-    if privkey != privkey_wif_uncompressed:
-        print("privkey_wif_compressed='" + privkey)
-    else:
-        privkey_wif_uncompressed = privkey
+    privkey_bin = double_sha256_checksum(privkey_bytes)
+    privkey_wif = base58.b58encode(privkey_bin).decode('utf-8')
 
-    print(f"{privkey_wif_uncompressed=}")
+    return privkey_wif
+
+def privateWifKeyToHex(privkey_wif: str) -> str:
+
+    privkey_wif_uncompressed = uncompress_privkey(privkey_wif)
 
     privkey_hex = codecs.encode(base58.b58decode(privkey_wif_uncompressed), 'hex')
-
-    '''
-    # Check if the key is mainnet or testnet
-    if privkey_hex.startswith(b"80"):
-        testnet = False
-    elif privkey_hex.startswith(b"ef"):
-        testnet = True
-    '''
     privkey_hex = privkey_hex[2:-8] # remove net identifier and checksum  
+  
+    return codecs.decode(privkey_hex) # byte literal to string
 
-    privkey = codecs.decode(privkey_hex) # byte literal to string
+def privateKeyToPublicKeyWif(privkey: str) -> str:
 
-####
+    if len(privkey) != 64: # 64 chars is hex
+        privkey = privateWifKeyToHex(privkey)
 
-privkey_int = int(privkey, 16)
+    privkey_int = int(privkey, 16)
 
-x, y = scalar_mult(privkey_int, curve.g) # or use: ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
+    x, y = scalar_mult(privkey_int, curve.g) # or use: ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
 
-#print("\nCoords of the public key:", (x, y))
+    #print("\nCoords of the public key:", (x, y))
 
-x_hex = hex(x)[2:]
-y_hex = hex(y)[2:] 
+    x_hex = hex(x)[2:]
+    y_hex = hex(y)[2:] 
 
-pubkey = x_hex + y_hex
+    pubkey = x_hex + y_hex
 
-pubkey_address_uncompressed = compute_pubkey_address('04' + pubkey) 
-print(f"\n{pubkey_address_uncompressed=}")
+    pubkey_address_uncompressed = compute_pubkey_address('04' + pubkey) 
+    pubkey_compressed = compress_pubkey(pubkey)
+    pubkey_address_compressed = compute_pubkey_address(pubkey_compressed)
 
-pubkey_compressed = compress_pubkey(pubkey)
-pubkey_address_compressed = compute_pubkey_address(pubkey_compressed)
-print(f'{pubkey_address_compressed=}')
+    return (pubkey_address_compressed, pubkey_address_uncompressed)
+
+def wifToHash160(wif: str) -> str:
+
+    address_bin = base58.b58decode(wif)
+    hash_hex = codecs.encode(address_bin, 'hex')
+    hash160 = codecs.decode(hash_hex[2:42])
+
+    return hash160
+
+####################################################################################
+
+if __name__ == '__main__':
+    print(privateKeyToPublicKeyWif('7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113'))
+    print(privateKeyToPublicKeyWif('L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC'))
+    print(privateKeyToPublicKeyWif('5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'))
