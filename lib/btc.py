@@ -2,6 +2,17 @@ import hashlib
 import base58
 import codecs
 
+'''
+if __package__:
+    from .secp256k1 import curve, scalar_mult
+else:
+    from secp256k1 import curve, scalar_mult
+'''
+
+if __package__:
+    from os import sys, path
+    sys.path.append(path.dirname(path.abspath(__file__)))
+
 from secp256k1 import curve, scalar_mult
 
 def double_sha256_checksum(hex: bytes) -> bytes:

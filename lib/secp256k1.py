@@ -1,4 +1,5 @@
 import collections
+import random
 
 EllipticCurve = collections.namedtuple('EllipticCurve', 'name p a b g n h')
 
@@ -18,9 +19,7 @@ curve = EllipticCurve(
     h=1
 )
 
-# Modular arithmetic ##########################################################
-
-def inverse_mod(k, p):
+def inverse_mod(k, p = curve.n):
     """Returns the inverse of k modulo p.
     This function returns the only integer x such that (x * k) % p == 1.
     k must be non-zero and p must be a prime.
@@ -49,10 +48,6 @@ def inverse_mod(k, p):
     assert (k * x) % p == 1
 
     return x % p
-
-
-# Functions that work on curve points #########################################
-
 
 def is_on_curve(point):
     """Returns True if the given point lies on the elliptic curve."""
@@ -101,7 +96,7 @@ def point_add(point1, point2):
 
 def point_neg(point):
     x, y = point
-    return (x, -y)
+    return (x, curve.n - y)
 
 def scalar_mult(k, point):
     """Returns k * point computed using the double and point_add algorithm."""
@@ -131,9 +126,20 @@ def scalar_mult(k, point):
 
     return result
 
-if __name__ == '__main__':
+def sign(z: int, d: int, k: int = random.randrange(1, curve.n)) -> list[int]:
 
-    import random
+    R = scalar_mult(k, curve.g) 
+
+    r = R[0]
+    k_inv = inverse_mod(k) 
+    s = (k_inv * (z + r*d)) % curve.n
+
+    if s > curve.n/2:
+        s = curve.n - s
+
+    return (r, s)
+
+if __name__ == '__main__':
 
     print("Basepoint:\t", curve.g)
 
@@ -145,7 +151,7 @@ if __name__ == '__main__':
 
     abG = scalar_mult(b, aG)
 
-    a_inv = inverse_mod(a,curve.n)
+    a_inv = inverse_mod(a)
 
     bG_recover = scalar_mult(a_inv, abG)
 

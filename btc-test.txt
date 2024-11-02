@@ -82,14 +82,8 @@ $ echo "
 00000000
 01000000" | tr -d '\n ' | xxd -p -r | sha256sum -b | xxd -p -r | sha256sum -b | xxd -p -r > first.msg
 
+Sign the message (and verify using the public key)
 
-
-
-# the signing process 
-#  prepare pubkey:
-    openssl ec -in privkey.pem -pubout -out pubkey.pem
-#  sign:
-    openssl dgst -sign privkey.pem  -sha256 -hex tmp_utx.hex
-    openssl dgst -sign privkey.pem  -sha256 tmp_utx.hex > tmp_sig.hex
-#  verify:
-    openssl dgst -verify pubkey.pem -sha256 -signature tmp_sig.hex tmp_utx.hex
+$ openssl pkeyutl -sign -inkey priv1_pem.key -pkeyopt digest:sha256 -in first.msg > first.sig
+$ openssl ec -in priv1_pem.key -pubout -out pub1_pem.key
+$ openssl pkeyutl -verify -pubin -inkey pub1_pem.key -pkeyopt digest:sha256 -in first.msg -sigfile first.sig
