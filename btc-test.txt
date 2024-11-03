@@ -82,8 +82,18 @@ $ echo "
 00000000
 01000000" | tr -d '\n ' | xxd -p -r | sha256sum -b | xxd -p -r | sha256sum -b | xxd -p -r > first.msg
 
-Sign the message (and verify using the public key)
+Sign the message (and verify using the public key):
 
-$ openssl pkeyutl -sign -inkey priv1_pem.key -pkeyopt digest:sha256 -in first.msg > first.sig
+$ inkey priv1_pem.key -pkeyopt digest:sha256 -in first.msg > first.sig
 $ openssl ec -in priv1_pem.key -pubout -out pub1_pem.key
 $ openssl pkeyutl -verify -pubin -inkey pub1_pem.key -pkeyopt digest:sha256 -in first.msg -sigfile first.sig
+
+Print the signature:
+
+$ xxd -p -c256 first.sig
+
+30450220743f3859a79d7bfe267dcbe487e6c4afe0b19938b432324b1d1ab269d9e9e869022100fee4c70a254ee6ec6391c90d2b6aa6a85b056983262c17c464db419701288214
+
+30 45 02 20 743f3859a79d7bfe267dcbe487e6c4afe0b19938b432324b1d1ab269d9e9e869 02 21 00fee4c70a254ee6ec6391c90d2b6aa6a85b056983262c17c464db419701288214
+
+$ openssl asn1parse -inform d -in first.sig

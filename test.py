@@ -1,13 +1,12 @@
-from lib.btc import privateHexKeyToWif, privateKeyToPublicKeyWif, wifToHash160
+from lib.btc import extractSigDataFromTransaction
 
-#print(privateHexKeyToWif('7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113'))
-#print(wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk'))
-
-k = int('75bcd15', 16) # nonce
-z = int('a6b4103f527dfe43dfbadf530c247bac8a98b7463c7c6ad38eed97021d18ffcb', 16) # hash256(msg)
-d = int('f94a840f1e1a901843a75dd07ffcc5c84478dc4f987797474c9393ac53ab55e6', 16) # privkey
+k = 0x75bcd15 # nonce
+z = 0xa6b4103f527dfe43dfbadf530c247bac8a98b7463c7c6ad38eed97021d18ffcb # hash256(msg)
+d = 0xf94a840f1e1a901843a75dd07ffcc5c84478dc4f987797474c9393ac53ab55e6 # privkey
 
 from lib.secp256k1 import sign
 
 rs = sign(z, d, k)
 print(rs)
+
+print(extractSigDataFromTransaction('01000000012fc93dc03d05e450603e354be409cba8e74a75aece39e0e72ce32fe288350972010000006b483045022100c378e5e472769ea116ee84f24917d245659e3596c71a66a4ae75cb9f9fa046d702204b3942cc040ea596f9e9950775c5165b379a5f6857137d8d921c39978b6fa5ee012102bf8135821ba2d6a13a0028f405e55b0e8262f683f59f6b4b348bcc043185efa5ffffffff02394012000000000017a914847d516dc58631a6ec2b87d60854aae894b52c9e87f23a29000000000017a914a047f94cd407ae34820bdf81070da1a2955174098700000000')) # TODO the message must also get extracted

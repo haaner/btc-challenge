@@ -135,9 +135,117 @@ def wifToHash160(wif: str) -> str:
 
     return hash160
 
+def extractSigDataFromScriptSig(script_sig: str) -> list[int]:
+
+    if not script_sig.startswith('4830'):
+        raise Exception('invalid scriptSig')
+        
+    script_sig = script_sig[4:146] # extract the signature + two byte end sequence
+ 
+    if not script_sig.endswith('01'):
+        raise('invalid script sig')
+    
+    script_sig = script_sig[:-2] # remove the end sequence
+
+    total_len = script_sig[0:2]
+    script_sig = script_sig[4:] # remove total len and first type specifier
+
+    first_len_bytes = int(script_sig[0:2], 16)
+    script_sig = script_sig[2:] # remove first len
+    first_len_hex_chars = 2 * first_len_bytes
+    
+    r = script_sig[:first_len_hex_chars]
+    script_sig = script_sig[first_len_hex_chars:] # remove r
+   
+    script_sig = script_sig[2:] # remove second type specifier
+
+    sec_len_bytes = int(script_sig[0:2], 16)
+    script_sig = script_sig[2:] # remove second len
+    sec_len_hex_chars = 2 * sec_len_bytes
+
+    s = script_sig[:sec_len_hex_chars]
+    script_sig = script_sig[sec_len_hex_chars:] # remove s
+    
+    if int(total_len, 16) - first_len_bytes - sec_len_bytes - 4 != 0:
+        raise Exception('scriptSig length mismatch')
+
+    return r, s
+
+def parseVarint(varint: str) -> list: 
+
+    first_byte = varint[0:2]
+    varint = varint[2:]
+
+    intval = int('0x' + first_byte, 16)
+
+    if intval <= 0xfc:
+        pass
+    else:
+        if intval <= 0xfd:
+            count = 4
+        elif intval <= 0xfe:
+            count = 8
+        else:
+            count = 16
+
+        byteval = varint[0:count]
+        intval = int('0x' + byteval, 16)
+        varint = varint[count:]
+        
+    return (intval, varint)
+
+'''
+02000000 // version // 4 bytes
+[ 00 01 ] // optional segregated witness marker + flag // 2 bytes 
+02 // inputs // varint -> 1, 3, 5 or 9 bytes - normally 1 byte as long as #inputs <= FC == 252
+55a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af // prev transaction id (little-endian) // 32 bytes
+00000000 // vout of the previous transaction (little-endian) // 4 bytes
+XX // scriptSig size // varint
+<scriptSig>
+ffffffff // sequence (locktime + RBF) // 4 bytes
+... // second input
+'''
+
+
+def extractSigDataFromTransaction(trx: str) -> list[list[int]]: 
+
+    trx = trx[8:] # remove version
+    
+    if trx.startswith('00'):
+        trx = trx[4]
+        raise('segregated witness transaction are not implemented')
+    
+    inputs, trx = parseVarint(trx)
+
+    trx = trx[72:] # remove prev transaction id and vout
+
+    rs = []
+    for i in range(inputs):
+        script_sig_size, trx = parseVarint(trx)
+      
+        #print('trx', trx)
+        script_sig_size *= 2
+        script_sig = trx[:script_sig_size]
+        trx = trx[script_sig_size:]
+
+        rs.append(extractSigDataFromScriptSig(script_sig))
+        trx = trx[8:] # remove end sequence
+
+        #print(script_sig, trx)
+
+
+    return rs
+
 ####################################################################################
 
 if __name__ == '__main__':
-    print(privateKeyToPublicKeyWif('7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113'))
-    print(privateKeyToPublicKeyWif('L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC'))
-    print(privateKeyToPublicKeyWif('5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'))
+
+    #print(privateKeyToPublicKeyWif('7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113'))
+    #print(privateKeyToPublicKeyWif('L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC'))
+    #print(privateKeyToPublicKeyWif('5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'))
+    
+    #print(privateHexKeyToWif('7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113'))
+
+    #print(wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk'))
+
+    print(extractSigDataFromScriptSig('483045022100b8e920e1573578b5c2dd84864fce6f0681d7753b266c59682179a00c05c76d8d02201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'))
