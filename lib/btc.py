@@ -15,16 +15,20 @@ if __package__:
 
 from secp256k1 import curve, scalar_mult
 
-def double_sha256_checksum(hex: bytes) -> bytes:
-    """Double sha256 function returning the checksum attached to input as binary"""
+def hash256(hex: bytes) -> bytes:
+    """Returns the hex input hash160'ed hex bytes"""
 
     bin = codecs.decode(hex, 'hex')
 
     hash = hashlib.sha256(bin).digest()
     hash2 = hashlib.sha256(hash).digest()
-    
-    hash2_hex = codecs.encode(hash2, 'hex')
 
+    return codecs.encode(hash2, 'hex')
+
+def addHash160Checksum(hex: bytes) -> bytes:
+    """Attaches the hash160 checksum of the hex bytes input to its end and returns the result as binary bytes"""
+
+    hash2_hex = hash256(hex)
     checksum = hash2_hex[:8]
     hex += checksum
 
@@ -39,7 +43,7 @@ def uncompress_privkey(privkey_wif_compressed: str) -> str:
 
     if privkey_hex.endswith(b"01"): # The private key indicates that the public key should get compressed 
         privkey_hex = privkey_hex[:-2]
-        privkey_bin = double_sha256_checksum(privkey_hex)
+        privkey_bin = addHash160Checksum(privkey_hex)
 
         # convert private_key into base58 encoded string
         privkey_wif_uncompressed = base58.b58encode(privkey_bin).decode('utf-8')
@@ -61,7 +65,7 @@ def compute_pubkey_address(pubkey: str) -> str:
 
     modified_key_hash = "00" + key_hash # 00 for main net
 
-    byte_25_address = double_sha256_checksum(bytes(bytearray(modified_key_hash, 'ascii')))
+    byte_25_address = addHash160Checksum(bytes(bytearray(modified_key_hash, 'ascii')))
 
     address = base58.b58encode(byte_25_address).decode('utf-8')
 
@@ -91,7 +95,7 @@ def privateHexKeyToWif(privkey_hex: str, compress: bool = True, mainnet = True) 
 
     privkey_bytes = bytes(bytearray(privkey_hex, 'ascii'))
 
-    privkey_bin = double_sha256_checksum(privkey_bytes)
+    privkey_bin = addHash160Checksum(privkey_bytes)
     privkey_wif = base58.b58encode(privkey_bin).decode('utf-8')
 
     return privkey_wif
@@ -168,7 +172,7 @@ def extractSigDataFromScriptSig(script_sig: str) -> list[int]:
     if total_len - first_len_bytes - sec_len_bytes - 4 != 0:
         raise Exception('scriptSig length mismatch')
 
-    return r, s
+    return int(r, 16), int(s, 16)
 
 def parseVarint(varint: str) -> list: 
 
@@ -187,23 +191,103 @@ def parseVarint(varint: str) -> list:
         else:
             count = 16
 
-        byteval = varint[0:count]
+        byteval = varint[0:count+1] # fix
         intval = int('0x' + byteval, 16)
         varint = varint[count:]
         
     return (intval, varint)
 
-def extractSigDataFromTransaction(trx: str) -> list[list[int]]: 
-
+def parseInputsAndRemovePrevTransaction(trx: str) -> list:
     trx = trx[8:] # remove version
     
     if trx.startswith('00'):
         trx = trx[4]
-        raise('segregated witness transaction are not implemented')
+        raise('segregated witness transactions are not implemented')
     
     inputs, trx = parseVarint(trx)
 
     trx = trx[72:] # remove prev transaction id and vout
+
+    return (inputs, trx)
+
+def extractPubkeysAndScriptSigIndices(trx: str):
+    
+    # Backup the trx
+    trx_bak = trx
+
+    # Get the input count
+    inputs, trx = parseInputsAndRemovePrevTransaction(trx)
+
+    pubkey_script_sig_idx = []
+
+    # Extract the public keys of all inputs and the start / end indices of the corresponding script sig sections
+    for i in range(inputs):
+        script_sig_start_index = len(trx_bak) - len(trx)
+
+        script_sig_bytes, trx = parseVarint(trx)
+        sig_bytes, trx = parseVarint(trx)
+
+        trx = trx[sig_bytes * 2:] # remove the sig
+
+        pubkey_bytes, trx = parseVarint(trx)
+        pubkey_len = pubkey_bytes * 2
+
+        pubkey = trx[:pubkey_len]
+        trx = trx[pubkey_len:] # remove the pubkey
+
+        script_sig_end_index = len(trx_bak) - len(trx)
+        pubkey_script_sig_idx.append([ pubkey, script_sig_start_index, script_sig_end_index ])
+
+        #print(trx_bak[script_sig_start_index:script_sig_end_index])
+        
+        trx = trx[8:] # remove end sequence
+
+    return pubkey_script_sig_idx
+
+def getScriptSigMsgs(trx: str):
+    
+    # Backup the trx
+    trx_bak = trx
+
+    pubkey_script_sig_idx = extractPubkeysAndScriptSigIndices(trx)
+
+    msgs = []
+
+    for pubkey, script_sig_start_index, script_sig_end_index in pubkey_script_sig_idx:
+        trx = trx_bak
+
+        #print(script_sig_start_index)
+
+        pubkey_script_sig_idx_reversed = pubkey_script_sig_idx
+        pubkey_script_sig_idx_reversed.reverse()
+
+        #print(pubkey_script_sig_idx_reversed)
+
+        for pubkey2, script_sig_start_index2, script_sig_end_index2 in pubkey_script_sig_idx_reversed:
+
+            trx_first = trx[:script_sig_start_index2]
+            trx_second = trx[script_sig_end_index2:]
+
+            if script_sig_start_index2 == script_sig_start_index:
+                # insert pubkey len and pubkey
+                insertion = '19' + pubkey
+            else: # replace other script sigs with 0x0
+                insertion = '00'
+        
+            trx = trx_first + insertion + trx_second
+
+        trx += '01000000' # add the SIGHASH_ALL sequence
+        
+        #print(trx)            
+        # generate hash256 msg and store it
+        msg_hex = hash256(bytes(bytearray(trx, 'ascii')))
+
+        msgs.append(int(msg_hex, 16))
+
+    return msgs
+
+def extractSigDataFromTransaction(trx: str) -> list[list[int]]: 
+    inputs, trx = parseInputsAndRemovePrevTransaction(trx)
 
     rs = []
     for i in range(inputs):
@@ -218,6 +302,12 @@ def extractSigDataFromTransaction(trx: str) -> list[list[int]]:
 
     return rs
 
+def getRszFromTrx(trx: str): 
+    rs = extractSigDataFromTransaction(trx)
+    msg = getScriptSigMsgs(trx)
+
+    return list(zip(rs, msg))
+
 ####################################################################################
 
 if __name__ == '__main__':
@@ -230,4 +320,11 @@ if __name__ == '__main__':
 
     #print(wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk'))
 
-    print(extractSigDataFromScriptSig('483045022100b8e920e1573578b5c2dd84864fce6f0681d7753b266c59682179a00c05c76d8d02201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'))
+    #print(extractSigDataFromScriptSig('483045022100b8e920e1573578b5c2dd84864fce6f0681d7753b266c59682179a00c05c76d8d02201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'))
+
+    trx = '01000000012fc93dc03d05e450603e354be409cba8e74a75aece39e0e72ce32fe288350972010000006b483045022100c378e5e472769ea116ee84f24917d245659e3596c71a66a4ae75cb9f9fa046d702204b3942cc040ea596f9e9950775c5165b379a5f6857137d8d921c39978b6fa5ee012102bf8135821ba2d6a13a0028f405e55b0e8262f683f59f6b4b348bcc043185efa5ffffffff02394012000000000017a914847d516dc58631a6ec2b87d60854aae894b52c9e87f23a29000000000017a914a047f94cd407ae34820bdf81070da1a2955174098700000000'
+
+    #print(getScriptSigMsgs(trx))
+    #print(extractSigDataFromTransaction(trx))
+
+    print(getRszFromTrx(trx))
