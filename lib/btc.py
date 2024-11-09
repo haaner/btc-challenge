@@ -220,7 +220,7 @@ def extractPubkeysAndScriptSigIndices(trx: str):
 
     pubkey_script_sig_idx = []
 
-    # Extract the public keys of all inputs and the start / end indices of the corresponding script sig sections
+    # Extract the "public keys" (P2PK <-> P2PKH <-> P2SH) of all inputs and the start / end indices of the corresponding script sig sections
     for i in range(inputs):
         script_sig_start_index = len(trx_bak) - len(trx)
 
@@ -243,6 +243,21 @@ def extractPubkeysAndScriptSigIndices(trx: str):
         trx = trx[8:] # remove end sequence
 
     return pubkey_script_sig_idx
+
+def getSignatureHashingSequence(signature: str) -> str:
+            
+    script_sig_len, signature = parseVarint(signature)
+    sig_len, signature = parseVarint(signature) 
+    sig_len *= 2
+
+    signature_last_2chars = signature[sig_len - 2:sig_len]
+
+    if signature_last_2chars not in [ '01', '02', '03' ]:
+        raise Exception('ANYONECANPAY signature handling is not implemented')
+
+    sequence = int('0x' + signature_last_2chars, 16).to_bytes(4, byteorder='little').hex()
+
+    return sequence
 
 def getScriptSigMsgs(trx: str):
     
@@ -269,16 +284,19 @@ def getScriptSigMsgs(trx: str):
             trx_second = trx[script_sig_end_index2:]
 
             if script_sig_start_index2 == script_sig_start_index:
-                # insert pubkey len and pubkey
-                insertion = '19' + pubkey
+                pubkey_byte_len = hex(len(pubkey) >> 1)
+                # insert pubkey length and pubkey
+                insertion = pubkey_byte_len[2:] + pubkey
             else: # replace other script sigs with 0x0
                 insertion = '00'
         
             trx = trx_first + insertion + trx_second
 
-        trx += '01000000' # add the SIGHASH_ALL sequence
-        
+        signature = trx_bak[script_sig_start_index:script_sig_end_index]     
+        trx += getSignatureHashingSequence(signature) # add the SIGHASH sequence
+
         #print(trx)            
+
         # generate hash256 msg and store it
         msg_hex = hash256(bytes(bytearray(trx, 'ascii')))
 
