@@ -197,18 +197,46 @@ def parseVarint(varint: str) -> list:
         
     return (intval, varint)
 
-def parseInputsAndRemovePrevTransaction(trx: str) -> list:
+def parseInputs(trx: str) -> list:
     trx = trx[8:] # remove version
     
     if trx.startswith('00'):
         trx = trx[4]
         raise('segregated witness transactions are not implemented')
     
-    inputs, trx = parseVarint(trx)
+    return parseVarint(trx)
 
-    trx = trx[72:] # remove prev transaction id and vout
+def extractPreviousTrxIdVout(trx: str):
 
-    return (inputs, trx)
+    # extract prev trx id and reverse its byte order
+    prev_trx_id = trx[:64]
+    trx = trx[64:]
+    prev_trx_id_rev = int('0x' + prev_trx_id, 16).to_bytes(32, byteorder='little').hex()
+    
+    # extract prev trx vout and reverse its byte order
+    prev_trx_vout = trx[:8]
+    trx = trx[8:] 
+    prev_trx_vout_rev = int('0x' + prev_trx_vout, 16).to_bytes(4, byteorder='little').hex()
+   
+    prev_trx_vout_rev_int = int('0x' + prev_trx_vout_rev, 16) # convert vout to integer
+
+    return ((prev_trx_id_rev, prev_trx_vout_rev_int), trx)
+
+def fetchTransaction(trx_id: str):
+
+    import urllib.request
+    result = urllib.request.urlopen('https://learnmeabitcoin.com/explorer/download.php?tx=' + trx_id + '&type=json').read()
+
+    import json
+    contents = json.loads(result)
+    #print(contents['scriptPubKey'])
+    return contents #['hex']
+
+def extractScriptPubKey(trx_id: str, vout: int):
+
+    # fetch the scriptPubKey of the previous trx vout
+    trx_prev = fetchTransaction(trx_id)
+    print('prev trx = ', trx_prev['vout'])
 
 def extractPubkeysAndScriptSigIndices(trx: str):
     
@@ -216,12 +244,16 @@ def extractPubkeysAndScriptSigIndices(trx: str):
     trx_bak = trx
 
     # Get the input count
-    inputs, trx = parseInputsAndRemovePrevTransaction(trx)
+    inputs, trx = parseInputs(trx)
 
     pubkey_script_sig_idx = []
 
     # Extract the "public keys" (P2PK <-> P2PKH <-> P2SH) of all inputs and the start / end indices of the corresponding script sig sections
     for i in range(inputs):
+        trx_prev_id_vout, trx = extractPreviousTrxIdVout(trx)
+
+        #spk = extractScriptPubKey(*trx_prev_id_vout)
+
         script_sig_start_index = len(trx_bak) - len(trx)
 
         script_sig_bytes, trx = parseVarint(trx)
@@ -265,6 +297,7 @@ def getScriptSigMsgs(trx: str):
     trx_bak = trx
 
     pubkey_script_sig_idx = extractPubkeysAndScriptSigIndices(trx)
+    print(f'{pubkey_script_sig_idx=}')
 
     msgs = []
 
@@ -304,11 +337,13 @@ def getScriptSigMsgs(trx: str):
 
     return msgs
 
-def extractSigDataFromTransaction(trx: str) -> list[list[int]]: 
-    inputs, trx = parseInputsAndRemovePrevTransaction(trx)
+def extractSigDataFromTransaction(trx: str) -> list: 
+    inputs, trx = parseInputs(trx)
 
     rs = []
     for i in range(inputs):
+        trx_prev_id_vout, trx = extractPreviousTrxIdVout(trx)
+
         script_sig_size, trx = parseVarint(trx)
       
         script_sig_size *= 2

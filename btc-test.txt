@@ -9,7 +9,7 @@ XX // scriptSig size // varint
 <scriptSig>
 ffffffff // sequence (locktime + RBF) // 4 bytes
 ... // second input
-02 // outputs // varint
+02 // outputs // varint // two P2PKH outputs
 00e2040000000000 // amount to spend // 8 bytes
 19 // 2 + size of YY + YY + 2 // varint
 76 // OP_DUP 
