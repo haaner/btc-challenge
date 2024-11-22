@@ -28,11 +28,14 @@ def parseVarint(varint: str) -> list:
 class Operation:
     HASH160 = 'a9'
     PUSHBYTES_20 = '14'
+    PUSHBYTES_32 = '20'
     EQUAL = '87'
     PUSHBYTES_65 = '41'
     CHECKSIG = 'ac'
     DUP = '76'
     EQUALVERIFY = '88'
+    ZERO = '00'
+    ONE = '51'
 
     @staticmethod
     def parseCode(raw: str):
@@ -111,7 +114,9 @@ class ScriptPubKey:
 
         op_code, raw = Operation.parseCode(raw)
 
-        if op_code == Operation.HASH160: # P2SH
+        if op_code == Operation.HASH160:
+            self.type = 'P2SH'
+            
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.PUSHBYTES_20:
                 raise('unknown locking script')
@@ -123,7 +128,9 @@ class ScriptPubKey:
             if op_code != Operation.EQUAL:
                 raise('unknown locking script end sequence')
             
-        elif op_code == Operation.PUSHBYTES_65: # P2PK
+        elif op_code == Operation.PUSHBYTES_65: 
+            self.type = 'P2PK'
+            
             self.pubKey = raw[:130]
             raw = raw[130:]
         
@@ -131,7 +138,9 @@ class ScriptPubKey:
             if op_code != Operation.CHECKSIG:
                 raise('unknown locking script end sequence')
             
-        elif op_code == Operation.DUP: # P2PKH
+        elif op_code == Operation.DUP: 
+            self.type = 'P2PKH'
+
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.HASH160:
                 raise('unknown locking script')
@@ -150,6 +159,34 @@ class ScriptPubKey:
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.CHECKSIG:
                 raise('unknown locking script end sequence')
+
+        elif op_code == Operation.ZERO:             
+            op_code, raw = Operation.parseCode(raw)
+
+            if op_code == Operation.PUSHBYTES_20:
+                self.type = 'P2WPKH'
+                
+                self.pubKey = raw[:40]
+                raw = raw[40:]
+
+            elif op_code == Operation.PUSHBYTES_32:
+                self.type = 'P2WSH'
+                
+                self.pubKey = raw[:64]
+                raw = raw[64:]
+
+            else:
+                raise('unknown locking script')
+
+        elif op_code == Operation.ONE:             
+            self.type = 'P2TR'
+
+            op_code, raw = Operation.parseCode(raw)
+            if op_code != Operation.PUSHBYTES_32:
+                raise('unknown locking script')                     
+            
+            self.pubKey = raw[:64]
+            raw = raw[64:]            
             
         else:
             raise('unknown locking script')     
@@ -157,7 +194,7 @@ class ScriptPubKey:
         self.raw = self.raw[:len(self.raw) - len(raw)]           
         
     def __str__(self):
-        return f'{{ {self.raw=}, {self.pubKey=} }}'
+        return f'{{ {self.raw=}, {self.type=}, {self.pubKey=} }}'
     
     def __repr__(self):
         return str(self)
