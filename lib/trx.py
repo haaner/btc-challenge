@@ -287,20 +287,24 @@ class Output:
 
 class Trx:
 
-    def __init__(self, id: str = None):
+    def __init__(self, id: str = None, is_test: bool = False):
+
         self.id = id
+        self.isTest = is_test
         
         if (self.id):
+            slug = 'testnet/' if self.isTest else ''
+
             import urllib.request
-            result = urllib.request.urlopen('https://learnmeabitcoin.com/explorer/download.php?tx=' + id + '&type=json').read()
+            result = urllib.request.urlopen('https://mempool.space/' + slug + 'api/tx/' + self.id + '/hex').read()
 
-            import json
-            contents = json.loads(result)
-
-            self.setRaw(contents['hex'])
+            self.setRaw(result.decode('utf-8'), self.isTest)
     
-    def setRaw(self, raw: str):
+    def setRaw(self, raw: str, is_test: bool = False):
+
         self.raw = raw
+        self.isTest = is_test
+
         self._parseRaw()
 
         self._msgs = None
@@ -362,6 +366,9 @@ class Trx:
     def __str__(self):
         return f'{{ {self.id=}, {self.raw=}, {self.inputCount=}, {self.inputs=}, {self.outputCount=}, {self.outputs=}, {self.usesSegWit=} }}'
     
+    def __repr__(self):
+        return str(self)    
+    
     def getScriptSigMsgs(self):
         from btc import hash256
         
@@ -387,7 +394,7 @@ class Trx:
                 input = self.inputs[i]
 
                 # get the script pubkey of the prev_trx vout
-                prev_trx = Trx(input.prevTrxId)
+                prev_trx = Trx(input.prevTrxId, self.isTest)
                 prev_trx_output = prev_trx.outputs[input.prevTrxVout]   
 
                 prev_trx_output_script_pubkey = prev_trx_output.scriptPubKey.raw
@@ -414,7 +421,7 @@ class Trx:
                     raw = raw_first + insertion + raw_second
 
                 raw += input.sigScript.getHashingSequence() # add the SIGHASH sequence
-                #print(raw)            
+                print('msg', raw)            
 
                 # generate hash256 msg and store it
                 msg_hex = hash256(bytes(bytearray(raw, 'ascii')))
@@ -437,9 +444,8 @@ if __name__ == '__main__':
 
     #trx2.getScriptSigMsgs()
 
-    test_trx = Trx('1eea8850090f170bc0e9557a04c9547bf9470941017526a68ae5e36e26bad9b3')
-    #test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000')
+    test_trx = Trx()
+    test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
-    print(test_trx)
-
-   
+    print(f'{test_trx=}')
+    print(test_trx.getScriptSigMsgs())
