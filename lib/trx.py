@@ -92,6 +92,14 @@ class Operation:
         raw = raw[2:]
 
         return op_code, raw
+
+class ScriptType:
+    P2PK = 'P2PK'
+    P2PKH = 'P2PKH'
+    P2SH = 'P2SH'
+    P2WPKH = 'P2WPKH'
+    P2WSH = 'P2WSH'
+    P2TR = 'P2TR'
     
 class ScriptSig:
     def __init__(self, raw, start_index):
@@ -113,7 +121,7 @@ class ScriptSig:
         op_code, script_sig = Operation.parseCode(script_sig)
 
         if op_code == Operation.ZERO: 
-            self.type = 'P2SH'
+            self.type = ScriptType.P2SH
 
             op_code, script_sig = Operation.parseCode(script_sig)
             if op_code != Operation.PUSHBYTES_71:
@@ -126,7 +134,7 @@ class ScriptSig:
             if op_code != Operation.PUSHBYTES_71:
                 raise Exception('unknown unlocking script')
 
-            self.pubKey = script_sig[:142]
+            self.pubKey = None # TODO p2sh: Pay-to-script-hash. The public key(s) are packed into the redeem script which is the last item in scriptSig. To get them you need to parse the redeem script (which itself is a script) and look for key patterns (push of 33 bytes).
 
             script_sig = script_sig[142:]
             if script_sig != '':
@@ -141,10 +149,10 @@ class ScriptSig:
             script_sig = script_sig[char_count:]
 
             if op_code == Operation.PUSHBYTES_71 and script_sig == '':
-                self.type = 'P2PK' 
+                self.type = ScriptType.P2PK 
                 self.pubKey = None
             else:
-                self.type = 'P2PKH'
+                self.type = ScriptType.P2PKH
 
                 op_code, script_sig = Operation.parseCode(script_sig)
                 if op_code in [ Operation.PUSHBYTES_33, Operation.PUSHBYTES_65 ]:
@@ -216,7 +224,7 @@ class ScriptPubKey:
         op_code, raw = Operation.parseCode(raw)
 
         if op_code == Operation.HASH160:
-            self.type = 'P2SH'
+            self.type = ScriptType.P2SH
             
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.PUSHBYTES_20:
@@ -229,18 +237,21 @@ class ScriptPubKey:
             if op_code != Operation.EQUAL:
                 raise Exception('unknown locking script end sequence')
             
-        elif op_code == Operation.PUSHBYTES_65: 
-            self.type = 'P2PK'
+        elif op_code in [ Operation.PUSHBYTES_33, Operation.PUSHBYTES_65 ]: 
+            self.type = ScriptType.P2PK
+
+            byte_count = int('0x' + op_code, 16);
+            char_count = byte_count * 2
             
-            self.pubKey = raw[:130]
-            raw = raw[130:]
+            self.pubKey = raw[:char_count]
+            raw = raw[char_count:]
         
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.CHECKSIG:
                 raise Exception('unknown locking script end sequence')
             
         elif op_code == Operation.DUP: 
-            self.type = 'P2PKH'
+            self.type = ScriptType.P2PKH
 
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.HASH160:
@@ -265,13 +276,13 @@ class ScriptPubKey:
             op_code, raw = Operation.parseCode(raw)
 
             if op_code == Operation.PUSHBYTES_20:
-                self.type = 'P2WPKH'
+                self.type = ScriptType.P2WPKH
                 
                 self.pubKey = raw[:40]
                 raw = raw[40:]
 
             elif op_code == Operation.PUSHBYTES_32:
-                self.type = 'P2WSH'
+                self.type = ScriptType.P2WSH
                 
                 self.pubKey = raw[:64]
                 raw = raw[64:]
@@ -280,7 +291,7 @@ class ScriptPubKey:
                 raise Exception('unknown locking script')
 
         elif op_code == Operation.ONE:             
-            self.type = 'P2TR'
+            self.type = ScriptType.P2TR
 
             op_code, raw = Operation.parseCode(raw)
             if op_code != Operation.PUSHBYTES_32:
@@ -358,7 +369,7 @@ class Trx:
 
         self._parseRaw()
 
-        self._msgs = None
+        self._pkMsgs = None
         
     @staticmethod
     def _extractScriptPubKey(trx_id: str, vout: int):
@@ -420,10 +431,10 @@ class Trx:
     def __repr__(self):
         return str(self)    
     
-    def _getScriptSigMsgs(self):
+    def _getPkMsgs(self):
         from btc import hash160
         
-        if self._msgs == None:
+        if self._pkMsgs == None:
             
             sig_script_indices = []
             for i in range(self.inputCount):
@@ -443,7 +454,7 @@ class Trx:
 
             #print(sig_script_indices_reversed)
 
-            self._msgs = []
+            self._pkMsgs = []
             for i in range(self.inputCount):
                 raw = self.raw
                 
@@ -478,32 +489,39 @@ class Trx:
                 # generate hash160 from msg and store it
                 msg_hex = hash160(bytes(bytearray(raw, 'ascii')))
 
-                self._msgs.append(int(msg_hex, 16))
+                self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
 
-        return self._msgs
+        return self._pkMsgs
     
     def _getSignatureData(self) -> list: 
 
-        prs = []
+        tprs = []
         for i in range(self.inputCount):
             sig_script = self.inputs[i].sigScript
             signature = sig_script.signature
 
-            prs.append((sig_script.pubKey, ((int(signature.r, 16), int(signature.s, 16)))))
+            tprs.append(((sig_script.type, sig_script.pubKey), ((int(signature.r, 16), int(signature.s, 16)))))
 
-        return prs
+        return tprs
 
-    def getPubKeyRszList(self) -> list[PubKeyRsz]:
+    def getPubKeyRszList(self, pub_key: str = None) -> list[PubKeyRsz]:
         
         prsz: list[PubKeyRsz] = []
 
-        prs = self._getSignatureData()
-        msg = self._getScriptSigMsgs()
+        tps_rs = self._getSignatureData()
+        pb_msg = self._getPkMsgs()
 
-        l = list(zip(prs, msg))
+        l = list(zip(tps_rs, pb_msg))
         for i in range(len(l)):
-            (p, (r, s)), msg = l[i]
-            prsz.append(PubKeyRsz(p, r, s, msg))    
+            ((t, ps), (r, s)), (pb, msg) = l[i]
+
+            if t == ScriptType.P2PK:
+                p = pb
+            else:
+                p = ps
+
+            if pub_key == None or pub_key == p:
+                prsz.append(PubKeyRsz(p, r, s, msg))    
 
         return prsz
 
@@ -526,4 +544,5 @@ if __name__ == '__main__':
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
     #print(f'{test_trx=}')
-    print(test_trx.getPubKeyRszList())
+    
+    print(test_trx.getPubKeyRszList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'))
