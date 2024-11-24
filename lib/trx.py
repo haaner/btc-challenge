@@ -387,6 +387,11 @@ class Trx:
 
                 sig_script_indices.append((input.sigScript.startIndex, input.sigScript.endIndex))
 
+            sig_script_indices_reversed = sig_script_indices.copy()
+            sig_script_indices_reversed.reverse()                
+
+            #print(sig_script_indices_reversed)
+
             self._msgs = []
             for i in range(self.inputCount):
                 raw = self.raw
@@ -402,11 +407,6 @@ class Trx:
 
                 #print('19 or not', f'{pubkey_byte_len_hex=}')
         
-                sig_script_indices_reversed =  sig_script_indices
-                sig_script_indices_reversed.reverse()
-
-                #print(sig_script_indices_reversed)
-
                 for script_sig_start_index2, script_sig_end_index2 in sig_script_indices_reversed:
 
                     raw_first = raw[:script_sig_start_index2]
@@ -421,7 +421,8 @@ class Trx:
                     raw = raw_first + insertion + raw_second
 
                 raw += input.sigScript.getHashingSequence() # add the SIGHASH sequence
-                print('msg', raw)            
+         
+                #print('msg', raw)            
 
                 # generate hash160 from msg and store it
                 msg_hex = hash160(bytes(bytearray(raw, 'ascii')))
