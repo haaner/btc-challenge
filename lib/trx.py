@@ -25,6 +25,51 @@ def parseVarint(varint: str) -> list:
         
     return (intval, varint)
 
+class Signature:
+    def __init__(self, raw):
+        self.raw = raw
+
+        compound_identifier = raw[:2]
+        if compound_identifier != '30':
+            raise Exception('unknown compound identifier')
+        raw = raw[2:] 
+
+        total_len, raw = parseVarint(raw)
+
+        if raw[:2] != '02':
+            raise Exception('unknown first type specifier')
+        raw = raw[2:] 
+
+        first_len_bytes, raw = parseVarint(raw)
+        first_len_hex_chars = 2 * first_len_bytes
+        
+        self.r = raw[:first_len_hex_chars]
+        raw = raw[first_len_hex_chars:] # remove r
+
+        if raw[:2] != '02':
+            raise Exception('unknown second type specifier')
+        raw = raw[2:] 
+
+        sec_len_bytes, raw = parseVarint(raw)
+        sec_len_hex_chars = 2 * sec_len_bytes
+
+        self.s = raw[:sec_len_hex_chars]
+        raw = raw[sec_len_hex_chars:] # remove s
+        
+        if total_len - first_len_bytes - sec_len_bytes - 4 != 0:
+            raise Exception('signature length mismatch')
+
+        if raw not in [ '01', '02', '03' ]:
+            raise Exception('unknown hashing sequence') # ANYONECANPAY signature handling is not implemented
+
+        self.hashingSequence = int('0x' + raw, 16).to_bytes(4, byteorder='little').hex()
+
+    def __str__(self):
+        return f'{{ {self.raw=}, {self.r=}, {self.s=}, {self.hashingSequence=} }}'
+    
+    def __repr__(self):
+        return str(self)        
+
 class Operation:
     EQUAL = '87'
     HASH160 = 'a9'
@@ -74,7 +119,7 @@ class ScriptSig:
             if op_code != Operation.PUSHBYTES_71:
                 raise Exception('unknown unlocking script')
             
-            self.signature = script_sig[:142]
+            self.signature = Signature(script_sig[:142])
             script_sig = script_sig[142:]
             
             op_code, script_sig = Operation.parseCode(script_sig)
@@ -90,7 +135,7 @@ class ScriptSig:
             byte_count = int('0x' + op_code, 16);
             char_count = byte_count * 2
 
-            self.signature = script_sig[:char_count]
+            self.signature = Signature(script_sig[:char_count])
             script_sig = script_sig[char_count:]
 
             if op_code == Operation.PUSHBYTES_71 and script_sig == '':
@@ -113,18 +158,6 @@ class ScriptSig:
         else:
             raise Exception('unknown unlocking script') # TODO Nested Segwit / Native Segwit
 
-    def getHashingSequence(self) -> str:        
-        sig_len = len(self.signature)
-
-        signature_last_2chars = self.signature[sig_len - 2:sig_len]
-
-        if signature_last_2chars not in [ '01', '02', '03' ]:
-            raise Exception('ANYONECANPAY signature handling is not implemented')
-
-        sequence = int('0x' + signature_last_2chars, 16).to_bytes(4, byteorder='little').hex()
-
-        return sequence
-        
     def __str__(self):
         return f'{{ {self.raw=}, {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=} }}'
     
@@ -420,7 +453,7 @@ class Trx:
                 
                     raw = raw_first + insertion + raw_second
 
-                raw += input.sigScript.getHashingSequence() # add the SIGHASH sequence
+                raw += input.sigScript.signature.hashingSequence # add the SIGHASH sequence
          
                 #print('msg', raw)            
 
@@ -431,6 +464,15 @@ class Trx:
 
         return self._msgs
     
+    def extractSignatureData(self) -> list: 
+
+        rs = []
+        for i in range(self.inputCount):
+            signature = self.inputs[i].sigScript.signature
+            rs.append((int(signature.r, 16), int(signature.s, 16)))
+
+        return rs
+
 if __name__ == '__main__':
 
     #trx1 = Trx('a3cf0c4dd6c5dc905936785fa1685cce5c7f99970bae4f2bd417896967c2b305')
@@ -449,4 +491,5 @@ if __name__ == '__main__':
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
     print(f'{test_trx=}')
-    print(test_trx.getScriptSigMsgs())
+    print(test_trx.extractSignatureData())
+    #print(test_trx.getScriptSigMsgs())
