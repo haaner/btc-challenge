@@ -15,7 +15,7 @@ if __package__:
 
 from secp256k1 import curve, scalar_mult
 
-def hash256(hex: bytes) -> bytes:
+def hash160(hex: bytes) -> bytes:
     """Returns the hex input hash160'ed hex bytes"""
 
     bin = codecs.decode(hex, 'hex')
@@ -28,7 +28,7 @@ def hash256(hex: bytes) -> bytes:
 def addHash160Checksum(hex: bytes) -> bytes:
     """Attaches the hash160 checksum of the hex bytes input to its end and returns the result as binary bytes"""
 
-    hash2_hex = hash256(hex)
+    hash2_hex = hash160(hex)
     checksum = hash2_hex[:8]
     hex += checksum
 
@@ -331,7 +331,7 @@ def getScriptSigMsgs(trx: str):
         #print(trx)            
 
         # generate hash256 msg and store it
-        msg_hex = hash256(bytes(bytearray(trx, 'ascii')))
+        msg_hex = hash160(bytes(bytearray(trx, 'ascii')))
 
         msgs.append(int(msg_hex, 16))
 

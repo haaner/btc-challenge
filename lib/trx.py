@@ -370,7 +370,7 @@ class Trx:
         return str(self)    
     
     def getScriptSigMsgs(self):
-        from btc import hash256
+        from btc import hash160
         
         if self._msgs == None:
             
@@ -423,8 +423,8 @@ class Trx:
                 raw += input.sigScript.getHashingSequence() # add the SIGHASH sequence
                 print('msg', raw)            
 
-                # generate hash256 msg and store it
-                msg_hex = hash256(bytes(bytearray(raw, 'ascii')))
+                # generate hash160 from msg and store it
+                msg_hex = hash160(bytes(bytearray(raw, 'ascii')))
 
                 self._msgs.append(int(msg_hex, 16))
 
