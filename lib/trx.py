@@ -126,6 +126,8 @@ class ScriptSig:
             if op_code != Operation.PUSHBYTES_71:
                 raise Exception('unknown unlocking script')
 
+            self.pubKey = script_sig[:142]
+
             script_sig = script_sig[142:]
             if script_sig != '':
                 raise Exception('unknown unlocking script')
@@ -140,6 +142,7 @@ class ScriptSig:
 
             if op_code == Operation.PUSHBYTES_71 and script_sig == '':
                 self.type = 'P2PK' 
+                self.pubKey = None
             else:
                 self.type = 'P2PKH'
 
@@ -148,6 +151,8 @@ class ScriptSig:
 
                     byte_count = int('0x' + op_code, 16);
                     char_count = byte_count * 2
+
+                    self.pubKey = script_sig[:char_count]
 
                     script_sig = script_sig[char_count:]
                     if script_sig != '':
@@ -159,7 +164,7 @@ class ScriptSig:
             raise Exception('unknown unlocking script') # TODO Nested Segwit / Native Segwit
 
     def __str__(self):
-        return f'{{ {self.raw=}, {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=} }}'
+        return f'{{ {self.raw=}, {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=}, {self.pubKey=} }}'
     
     def __repr__(self):
         return str(self)
@@ -318,6 +323,19 @@ class Output:
     def __repr__(self):
         return str(self)    
 
+class PubKeyRsz:
+    def __init__(self, pub_key, r, s, z):
+        self.pubKey = pub_key
+        self.r = r
+        self.s = s
+        self.z = z
+
+    def __str__(self):
+        return f'{{ {self.pubKey=}, {self.r=}, {self.s=}, {self.z=} }}'
+    
+    def __repr__(self):
+        return str(self)  
+    
 class Trx:
 
     def __init__(self, id: str = None, is_test: bool = False):
@@ -402,7 +420,7 @@ class Trx:
     def __repr__(self):
         return str(self)    
     
-    def getScriptSigMsgs(self):
+    def _getScriptSigMsgs(self):
         from btc import hash160
         
         if self._msgs == None:
@@ -464,15 +482,32 @@ class Trx:
 
         return self._msgs
     
-    def extractSignatureData(self) -> list: 
+    def _getSignatureData(self) -> list: 
 
-        rs = []
+        prs = []
         for i in range(self.inputCount):
-            signature = self.inputs[i].sigScript.signature
-            rs.append((int(signature.r, 16), int(signature.s, 16)))
+            sig_script = self.inputs[i].sigScript
+            signature = sig_script.signature
 
-        return rs
+            prs.append((sig_script.pubKey, ((int(signature.r, 16), int(signature.s, 16)))))
 
+        return prs
+
+    def getPubKeyRszList(self) -> list[PubKeyRsz]:
+        
+        prsz: list[PubKeyRsz] = []
+
+        prs = self._getSignatureData()
+        msg = self._getScriptSigMsgs()
+
+        l = list(zip(prs, msg))
+        for i in range(len(l)):
+            (p, (r, s)), msg = l[i]
+            prsz.append(PubKeyRsz(p, r, s, msg))    
+
+        return prsz
+
+    
 if __name__ == '__main__':
 
     #trx1 = Trx('a3cf0c4dd6c5dc905936785fa1685cce5c7f99970bae4f2bd417896967c2b305')
@@ -490,6 +525,5 @@ if __name__ == '__main__':
     test_trx = Trx()
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
-    print(f'{test_trx=}')
-    print(test_trx.extractSignatureData())
-    #print(test_trx.getScriptSigMsgs())
+    #print(f'{test_trx=}')
+    print(test_trx.getPubKeyRszList())
