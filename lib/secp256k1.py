@@ -22,17 +22,15 @@ class Point:
     
 class EllipticCurve:
     def __init__(self, p: int, a: int, b: int, g: Point, n: int):
-        self.p = p # Field characteristic
-        self.a = a # Curve coefficient
-        self.b = b # Curve coefficient
-        self.g = g # Base point
-        self.n = n # Group order
+        self.p = p #: Field characteristic
 
-    def inverseMod(self, k: int, p: int = None) -> int:
-        if p == None:
-            p = self.n
-        
-        return inverseMod(k, p)
+        self.a = a #: Curve coefficient
+        self.b = b #: Curve coefficient     
+
+        self.g = g 
+        '''Group base / generator point'''
+        self.n = n 
+        '''Group order'''
 
     def contains(self, point: Point) -> bool:
         """Returns True if the given point lies on the elliptic curve."""
@@ -65,10 +63,10 @@ class EllipticCurve:
 
         if x1 == x2:
             # This is the case point1 == point2.
-            m = (3 * x1 * x1 + self.a) * self.inverseMod(2 * y1, self.p)
+            m = (3 * x1 * x1 + self.a) * inverseMod(2 * y1, self.p)
         else:
             # This is the case point1 != point2.
-            m = (y1 - y2) * self.inverseMod(x1 - x2, self.p)
+            m = (y1 - y2) * inverseMod(x1 - x2, self.p)
 
         x3 = m * m - x1 - x2
         y3 = y1 + m * (x3 - x1)
@@ -122,7 +120,7 @@ class EllipticCurve:
             P = self.mult(k, self.g)
 
             r = P.x % self.n
-            s = ((z + r * private_key) * self.inverseMod(k)) % self.n
+            s = ((z + r * private_key) * inverseMod(k, self.n)) % self.n
 
             if (r and s) or k2 != None:
                 break
@@ -132,11 +130,11 @@ class EllipticCurve:
 
         return (r, s)
     
-    def verifySignature(self, public_key, z, r_s) -> bool:
+    def verifySignature(self, public_key: Point, z: int, r_s: tuple[int, int]) -> bool:
 
         r, s = r_s
 
-        w = self.inverseMod(s)
+        w = inverseMod(s, self.n)
         u1 = (z * w) % self.n
         u2 = (r * w) % self.n
 
@@ -173,9 +171,20 @@ if __name__ == '__main__':
     
     print('\nMultiplication is commutative:', abG == baG)
 
-    a_inv = secp.inverseMod(a)
+    a_inv = inverseMod(a, secp.n)
     bG_recover = secp.mult(a_inv, abG)
   
     print("\na_inv abG:\t\t", bG_recover)
 
     if bG == bG_recover: print("\nKey recovered")
+
+    ###
+    
+    z = 47532434785953132308955062292737313655925535765828397397295369871553194000208
+    private_key = 0x514321CFA3C255BE2CE8249A70267B9D2935B7DC5B36055BA158D5F00C645F83
+    k = 0x75bcd15 # nonce
+
+    rs = secp.sign(z, private_key, k)
+    public_key = secp.mult(private_key, secp.g)
+
+    print('Is signature correct:', secp.verifySignature(public_key, z, rs))

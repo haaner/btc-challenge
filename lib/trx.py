@@ -2,7 +2,7 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from aux import hash160, parseVarint
+from aux import parseVarint
 
 class Signature:
     def __init__(self, raw):
@@ -313,15 +313,24 @@ class Output:
     def __repr__(self):
         return str(self)    
 
-class PubKeyRsz:
-    def __init__(self, pub_key, r, s, z):
+class PubKeySigMsg:
+    def __init__(self, pub_key: str, rs: tuple[int, int], z: int):
         self.pubKey = pub_key
-        self.r = r
-        self.s = s
-        self.z = z
+        self._pubKeyPoint = None
+        self.rs = rs
+        self.z = z   
 
+    def verify(self):
+        from btc import Btc
+        from secp256k1 import secp
+
+        if self._pubKeyPoint == None:
+            self._pubKeyPoint = Btc.publicKeyHexToSecpPoint(self.pubKey)
+
+        return secp.verifySignature(self._pubKeyPoint, prsz.z, prsz.rs)
+        
     def __str__(self):
-        return f'{{ {self.pubKey=}, {self.r=}, {self.s=}, {self.z=} }}'
+        return f'{{ {self.pubKey=}, {self.rs=}, {self.z=} }}'
     
     def __repr__(self):
         return str(self)  
@@ -411,7 +420,7 @@ class Trx:
         return str(self)    
     
     def _getPkMsgs(self):
-        from btc import Btc
+        from btc import hash160
         
         if self._pkMsgs == None:
             
@@ -483,16 +492,16 @@ class Trx:
 
         return tprs
 
-    def getPubKeyRszList(self, pub_key: str = None) -> list[PubKeyRsz]:
+    def getPubKeySigMsgList(self, pub_key: str = None) -> list[PubKeySigMsg]:
         
-        prsz: list[PubKeyRsz] = []
+        prsz: list[PubKeySigMsg] = []
 
         tps_rs = self._getSignatureData()
         pb_msg = self._getPkMsgs()
 
         l = list(zip(tps_rs, pb_msg))
         for i in range(len(l)):
-            ((t, ps), (r, s)), (pb, msg) = l[i]
+            ((t, ps), rs), (pb, msg) = l[i]
 
             if t == ScriptType.P2PK:
                 p = pb
@@ -500,7 +509,7 @@ class Trx:
                 p = ps
 
             if pub_key == None or pub_key == p:
-                prsz.append(PubKeyRsz(p, r, s, msg))    
+                prsz.append(PubKeySigMsg(p, rs, msg))    
 
         return prsz
 
@@ -521,6 +530,33 @@ if __name__ == '__main__':
     test_trx = Trx()
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
-    #print(f'{test_trx=}')
+    prsz_list = test_trx.getPubKeySigMsgList()
+
+    for i in range(len(prsz_list)):
+        prsz = prsz_list[i]
+        print('Is signature correct:', prsz.verify())
+'''
+    prsz_list = test_trx.getPubKeySigMsgList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459')
+    prsz = prsz_list[0]  
     
-    print(test_trx.getPubKeyRszList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'))
+    print('Is signature correct:', prsz.verify())
+
+    ###
+
+    trx = Trx()
+    trx.setRaw('0100000001a4e61ed60e66af9f7ca4f2eb25234f6e32e0cb8f6099db21a2462c42de61640b010000006b483045022100c233c3a8a510e03ad18b0a24694ef00c78101bfd5ac075b8c1037952ce26e91e02205aa5f8f88f29bb4ad5808ebc12abfd26bd791256f367b04c6d955f01f28a7724012103f0609c81a45f8cab67fc2d050c21b1acd3d37c7acfd54041be6601ab4cef4f31feffffff02f9243751130000001976a9140c443537e6e31f06e6edb2d4bb80f8481e2831ac88ac14206c00000000001976a914d807ded709af8893f02cdc30a37994429fa248ca88ac751a0600')
+    trx = Trx(trx.id)  
+    
+    prsz_list = trx.getPubKeySigMsgList(Btc.wifToHash160('18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8'))
+    print('Signatures for trx ' + trx.id + ':', len(prsz_list))
+    for prsz in prsz_list:
+        print('Is signature correct:', prsz.verify())
+    
+    prev_trx = Trx('72093588e22fe32ce7e039ceae754ae7a8cb09e44b353e6050e4053dc03dc92f')
+    
+    prsz_list = prev_trx.getPubKeySigMsgList()
+
+    for i in range(len(prsz_list)):
+        prsz = prsz_list[i]
+        
+        print('Is signature correct:', prsz.verify())

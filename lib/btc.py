@@ -1,6 +1,6 @@
-import hashlib
 import base58
 import codecs
+import hashlib
 
 '''
 if __package__:
@@ -13,11 +13,20 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
+def hash160(hex: bytes) -> bytes:
+    """Returns the hex input hash160'ed hex bytes"""
+
+    bin = codecs.decode(hex, 'hex')
+
+    hash = hashlib.sha256(bin).digest()
+    hash2 = hashlib.sha256(hash).digest()
+
+    return codecs.encode(hash2, 'hex')
+
 from secp256k1 import secp, Point
-from aux import hash160
 
 class Btc:
-
+    
     def addHash160Checksum(hex: bytes) -> bytes:
         """Attaches the first 4 bytes of the hash160 checksum of the hex bytes input to its end and returns the result as binary bytes"""
 

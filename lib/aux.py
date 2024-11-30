@@ -31,19 +31,6 @@ def inverseMod(k: int, p: int) -> int:
 
     return x % p
 
-def hash160(hex: bytes) -> bytes:
-    """Returns the hex input hash160'ed hex bytes"""
-
-    import codecs
-    import hashlib
-
-    bin = codecs.decode(hex, 'hex')
-
-    hash = hashlib.sha256(bin).digest()
-    hash2 = hashlib.sha256(hash).digest()
-
-    return codecs.encode(hash2, 'hex')
-
 def parseVarint(varint: str) -> tuple[int, str]: 
 
     first_byte = varint[0:2]
