@@ -2,28 +2,7 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-def parseVarint(varint: str) -> list: 
-
-    first_byte = varint[0:2]
-    varint = varint[2:]
-
-    intval = int('0x' + first_byte, 16)
-
-    if intval <= 0xfc:
-        pass
-    else:
-        if intval <= 0xfd:
-            count = 4
-        elif intval <= 0xfe:
-            count = 8
-        else:
-            count = 16
-
-        byteval = varint[0:count+1] # fix
-        intval = int('0x' + byteval, 16)
-        varint = varint[count:]
-        
-    return (intval, varint)
+from aux import hash160, parseVarint
 
 class Signature:
     def __init__(self, raw):
@@ -432,7 +411,7 @@ class Trx:
         return str(self)    
     
     def _getPkMsgs(self):
-        from btc import hash160
+        from btc import Btc
         
         if self._pkMsgs == None:
             

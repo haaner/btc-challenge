@@ -4,7 +4,7 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from aux import Aux
+from aux import inverseMod
 
 class Point:
     def __init__(self, x, y):
@@ -32,7 +32,7 @@ class EllipticCurve:
         if p == None:
             p = self.n
         
-        return Aux.inverseMod(k, p)
+        return inverseMod(k, p)
 
     def contains(self, point: Point) -> bool:
         """Returns True if the given point lies on the elliptic curve."""
