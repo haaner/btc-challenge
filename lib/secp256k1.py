@@ -130,7 +130,7 @@ def sign(z: int, d: int, k: int = random.randrange(1, curve.n)) -> list[int]:
 
     R = scalar_mult(k, curve.g) 
 
-    r = R[0]
+    r = R[0] % curve.n
     k_inv = inverse_mod(k) 
     s = (k_inv * (z + r*d)) % curve.n
 
@@ -139,6 +139,39 @@ def sign(z: int, d: int, k: int = random.randrange(1, curve.n)) -> list[int]:
 
     return (r, s)
 
+def sign_message(z: int, private_key: int):
+
+    r = 0
+    s = 0
+
+    while not r or not s:
+        k = random.randrange(1, curve.n)
+        x, y = scalar_mult(k, curve.g)
+
+        r = x % curve.n
+        s = ((z + r * private_key) * inverse_mod(k, curve.n)) % curve.n
+
+    if s > curve.n/2:
+        s = curve.n - s
+
+    return (r, s)
+
+def verify_signature(public_key, z, r_s):
+
+    r, s = r_s
+
+    w = inverse_mod(s, curve.n)
+    u1 = (z * w) % curve.n
+    u2 = (r * w) % curve.n
+
+    x, y = point_add(scalar_mult(u1, curve.g),
+                     scalar_mult(u2, public_key))
+
+    if (r % curve.n) == (x % curve.n):
+        return 'signature matches'
+    else:
+        return 'invalid signature'
+    
 if __name__ == '__main__':
 
     print("Basepoint:\t", curve.g)

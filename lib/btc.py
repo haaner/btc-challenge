@@ -84,6 +84,19 @@ def compress_pubkey(pubkey: str) -> str:
 
     return public_key_compressed
 
+def decompress_pubkey(pk):
+    from secp256k1 import curve
+
+    p = curve.p
+    
+    x = int.from_bytes(pk[1:33], byteorder='big')
+    y_sq = (pow(x, 3, p) + 7) % p
+    y = pow(y_sq, (p + 1) // 4, p)
+    if y % 2 != pk[0] % 2:
+        y = p - y
+    y = y.to_bytes(32, byteorder='big')
+    return b'\x04' + pk[1:33] + y
+
 def privateHexKeyToWif(privkey_hex: str, compress: bool = True, mainnet = True) -> str:
 
     if mainnet: variant = '80' 

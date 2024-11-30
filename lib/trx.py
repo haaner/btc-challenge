@@ -525,7 +525,6 @@ class Trx:
 
         return prsz
 
-    
 if __name__ == '__main__':
 
     #trx1 = Trx('a3cf0c4dd6c5dc905936785fa1685cce5c7f99970bae4f2bd417896967c2b305')
