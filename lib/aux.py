@@ -50,7 +50,7 @@ def parseVarint(varint: str) -> tuple[int, str]:
     varint = varint[2:]
 
     intval = int('0x' + first_byte, 16)
-
+    
     if intval <= 0xfc:
         pass
     else:
@@ -61,8 +61,14 @@ def parseVarint(varint: str) -> tuple[int, str]:
         else:
             count = 16
 
-        byteval = varint[0:count+1] # fix
-        intval = int('0x' + byteval, 16)
+        byteval = varint[:count]
+
+        intval = int.from_bytes(bytes.fromhex(byteval), byteorder='little')
         varint = varint[count:]
         
     return (intval, varint)
+
+if __name__ == '__main__':
+
+    print(parseVarint('fe59cd1e21affe'))
+    print(parseVarint('04affe'))
