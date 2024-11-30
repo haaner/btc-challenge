@@ -13,7 +13,7 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from secp256k1 import curve, scalar_mult
+from secp256k1 import secp
 
 def hash160(hex: bytes) -> bytes:
     """Returns the hex input hash160'ed hex bytes"""
@@ -85,9 +85,7 @@ def compress_pubkey(pubkey: str) -> str:
     return public_key_compressed
 
 def decompress_pubkey(pk):
-    from secp256k1 import curve
-
-    p = curve.p
+    p = secp.p
     
     x = int.from_bytes(pk[1:33], byteorder='big')
     y_sq = (pow(x, 3, p) + 7) % p
@@ -129,7 +127,7 @@ def privateKeyToPublicKeyWif(privkey: str) -> str:
 
     privkey_int = int(privkey, 16)
 
-    x, y = scalar_mult(privkey_int, curve.g) # or use: ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
+    x, y = secp.mult(privkey_int, secp.g) # or use: ecdsa.SigningKey.from_string(privkey_bin, curve=ecdsa.SECP256k1).verifying_key
 
     #print("\nCoords of the public key:", (x, y))
 

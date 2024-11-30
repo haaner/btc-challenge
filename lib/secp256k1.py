@@ -1,199 +1,181 @@
-import collections
-import random
+from random import randrange
 
-EllipticCurve = collections.namedtuple('EllipticCurve', 'name p a b g n h')
+if __package__:
+    from os import sys, path
+    sys.path.append(path.dirname(path.abspath(__file__)))
 
-curve = EllipticCurve(
-    'secp256k1',
-    # Field characteristic.
-    p=0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f,
-    # Curve coefficients.
-    a=0,
-    b=7,
-    # Base point.
-    g=(0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
-       0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
-    # Subgroup order.
-    n=0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141,
-    # Subgroup cofactor.
-    h=1
-)
+from aux import Aux
 
-def inverse_mod(k, p = curve.n):
-    """Returns the inverse of k modulo p.
-    This function returns the only integer x such that (x * k) % p == 1.
-    k must be non-zero and p must be a prime.
-    """
-    if k == 0:
-        raise ZeroDivisionError('division by zero')
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
-    if k < 0:
-        # k ** -1 = p - (-k) ** -1  (mod p)
-        return p - inverse_mod(-k, p)
+    def __eq__(self, other):   
+        return self.x == other.x and self.y == other.y
 
-    # Extended Euclidean algorithm.
-    s, old_s = 0, 1
-    t, old_t = 1, 0
-    r, old_r = p, k
-
-    while r != 0:
-        quotient = old_r // r
-        old_r, r = r, old_r - quotient * r
-        old_s, s = s, old_s - quotient * s
-        old_t, t = t, old_t - quotient * t
-
-    gcd, x, y = old_r, old_s, old_t
-
-    assert gcd == 1
-    assert (k * x) % p == 1
-
-    return x % p
-
-def is_on_curve(point):
-    """Returns True if the given point lies on the elliptic curve."""
-    if point is None:
-        # None represents the point at infinity.
-        return True
-
-    x, y = point
-
-    return (y * y - x * x * x - curve.a * x - curve.b) % curve.p == 0
-
-
-def point_add(point1, point2):
-    """Returns the result of point1 + point2 according to the group law."""
-    assert is_on_curve(point1)
-    assert is_on_curve(point2)
-
-    if point1 is None:
-        # 0 + point2 = point2
-        return point2
-    if point2 is None:
-        # point1 + 0 = point1
-        return point1
-
-    x1, y1 = point1
-    x2, y2 = point2
-
-    if x1 == x2 and y1 != y2:
-        # point1 + (-point1) = 0
-        return None
-
-    if x1 == x2:
-        # This is the case point1 == point2.
-        m = (3 * x1 * x1 + curve.a) * inverse_mod(2 * y1, curve.p)
-    else:
-        # This is the case point1 != point2.
-        m = (y1 - y2) * inverse_mod(x1 - x2, curve.p)
-
-    x3 = m * m - x1 - x2
-    y3 = y1 + m * (x3 - x1)
-    result = (x3 % curve.p, -y3 % curve.p)
-
-    assert is_on_curve(result)
-
-    return result
-
-def point_neg(point):
-    x, y = point
-    return (x, curve.n - y)
-
-def scalar_mult(k, point):
-    """Returns k * point computed using the double and point_add algorithm."""
-    assert is_on_curve(point)
-
-    if k % curve.n == 0 or point is None:
-        return None
-
-    if k < 0:
-        # k * point = -k * (-point)
-        return scalar_mult(-k, point_neg(point))
-
-    result = None
-    addend = point
-
-    while k:
-        if k & 1:
-            # Add.
-            result = point_add(result, addend)
-
-        # Double.
-        addend = point_add(addend, addend)
-
-        k >>= 1
-
-    assert is_on_curve(result)
-
-    return result
-
-def sign(z: int, d: int, k: int = random.randrange(1, curve.n)) -> list[int]:
-
-    R = scalar_mult(k, curve.g) 
-
-    r = R[0] % curve.n
-    k_inv = inverse_mod(k) 
-    s = (k_inv * (z + r*d)) % curve.n
-
-    if s > curve.n/2:
-        s = curve.n - s
-
-    return (r, s)
-
-def sign_message(z: int, private_key: int):
-
-    r = 0
-    s = 0
-
-    while not r or not s:
-        k = random.randrange(1, curve.n)
-        x, y = scalar_mult(k, curve.g)
-
-        r = x % curve.n
-        s = ((z + r * private_key) * inverse_mod(k, curve.n)) % curve.n
-
-    if s > curve.n/2:
-        s = curve.n - s
-
-    return (r, s)
-
-def verify_signature(public_key, z, r_s):
-
-    r, s = r_s
-
-    w = inverse_mod(s, curve.n)
-    u1 = (z * w) % curve.n
-    u2 = (r * w) % curve.n
-
-    x, y = point_add(scalar_mult(u1, curve.g),
-                     scalar_mult(u2, public_key))
-
-    if (r % curve.n) == (x % curve.n):
-        return 'signature matches'
-    else:
-        return 'invalid signature'
+    def __str__(self):
+        return f'{{ {self.x=}, {self.y=} }}'
     
+    def __repr__(self):
+        return str(self)       
+    
+class EllipticCurve:
+    def __init__(self, p: int, a: int, b: int, g: Point, n: int):
+        self.p = p # Field characteristic
+        self.a = a # Curve coefficient
+        self.b = b # Curve coefficient
+        self.g = g # Base point
+        self.n = n # Group order
+
+    def inverseMod(self, k: int, p: int = None) -> int:
+        if p == None:
+            p = self.n
+        
+        return Aux.inverseMod(k, p)
+
+    def contains(self, point: Point) -> bool:
+        """Returns True if the given point lies on the elliptic curve."""
+        if point is None:
+            # None represents the point at infinity.
+            return True
+
+        x, y = point.x, point.y
+
+        return (y * y - x * x * x - self.a * x - self.b) % self.p == 0
+
+    def add(self, point1: Point, point2: Point) -> Point:
+        """Returns the result of point1 + point2 according to the group law."""
+        assert self.contains(point1)
+        assert self.contains(point2)
+
+        if point1 is None:
+            # 0 + point2 = point2
+            return point2
+        if point2 is None:
+            # point1 + 0 = point1
+            return point1
+
+        x1, y1 = point1.x, point1.y
+        x2, y2 = point2.x, point2.y
+
+        if x1 == x2 and y1 != y2:
+            # point1 + (-point1) = 0
+            return None
+
+        if x1 == x2:
+            # This is the case point1 == point2.
+            m = (3 * x1 * x1 + self.a) * self.inverseMod(2 * y1, self.p)
+        else:
+            # This is the case point1 != point2.
+            m = (y1 - y2) * self.inverseMod(x1 - x2, self.p)
+
+        x3 = m * m - x1 - x2
+        y3 = y1 + m * (x3 - x1)
+
+        result = Point(x3 % self.p, -y3 % self.p)
+
+        assert self.contains(result)
+
+        return result
+
+    def negatePoint(self, point: Point) -> Point:
+        return Point(point.x, self.n - point.y)
+
+    def mult(self, k: int, point: Point) -> Point:
+        """Returns k * point computed using the double and point_add algorithm."""
+        assert self.contains(point)
+
+        if k % self.n == 0 or point is None:
+            return None
+
+        if k < 0:
+            # k * point = -k * (-point)
+            return self.mult(-k, self.negatePoint(point))
+
+        result = None
+        addend = point
+
+        while k:
+            if k & 1: # Add.
+                result = self.add(result, addend)
+
+            # Double.
+            addend = self.add(addend, addend)
+
+            k >>= 1
+
+        assert self.contains(result)
+
+        return result
+
+    def sign(self, z: int, private_key: int, k2: int = None) -> list[int]:
+
+        while True:
+
+            if k2 == None:
+                k = randrange(1, self.n)    
+            else:
+                k = k2
+
+            k = randrange(1, self.n)
+            P = self.mult(k, self.g)
+
+            r = P.x % self.n
+            s = ((z + r * private_key) * self.inverseMod(k)) % self.n
+
+            if (r and s) or k2 != None:
+                break
+
+        if s > self.n/2:
+            s = self.n - s
+
+        return (r, s)
+    
+    def verifySignature(self, public_key, z, r_s) -> bool:
+
+        r, s = r_s
+
+        w = self.inverseMod(s)
+        u1 = (z * w) % self.n
+        u2 = (r * w) % self.n
+
+        P = self.add(self.mult(u1, self.g), self.mult(u2, public_key))
+
+        return (r % self.n) == (P.x % self.n)
+        
+class Secp256k1(EllipticCurve):
+    def __init__(self):
+        super().__init__(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f, 0, 7, 
+                         Point(0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
+                         0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
+      
+secp = Secp256k1()
+      
 if __name__ == '__main__':
 
-    print("Basepoint:\t", curve.g)
+    print("Basepoint:\t", secp.g)
 
-    a  = random.randrange(1, curve.n)
-    aG = scalar_mult(a, curve.g)
-
-    b  = random.randrange(1, curve.n)
-    bG = scalar_mult(b, curve.g)
-
-    abG = scalar_mult(b, aG)
-
-    a_inv = inverse_mod(a)
-
-    bG_recover = scalar_mult(a_inv, abG)
-
-    print("Alice\'s secret key:\t", a)
-    print("a_inv:\t", a_inv)
+    a = randrange(1, secp.n)
+    print("\nAlice\'s secret key:\t", a)
+    
+    aG = secp.mult(a, secp.g)
     print("Alice\'s public key:\t", aG)
-    print("Bob\'s secret key:\t", b)
-    print("\n\nBob\'s public key:\t", bG)
+    
+    b = randrange(1, secp.n)
+    print("\nBob\'s secret key:\t", b)
+    
+    bG = secp.mult(b, secp.g)
+    print("Bob\'s public key:\t", bG)
+    
+    abG = secp.mult(b, aG)
+    baG = secp.mult(a, bG)
+    
+    print('\nMultiplication is commutative:', abG == baG)
 
-    print("a_inv abG:\t", bG_recover)
+    a_inv = secp.inverseMod(a)
+    bG_recover = secp.mult(a_inv, abG)
+  
+    print("\na_inv abG:\t\t", bG_recover)
 
-    if (bG==bG_recover): print("\nKey recovered")
+    if bG == bG_recover: print("\nKey recovered")
