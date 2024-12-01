@@ -84,7 +84,7 @@ $ echo "
 
 Sign the message (and verify using the public key):
 
-$ inkey priv1_pem.key -pkeyopt digest:sha256 -in first.msg > first.sig
+$ openssl pkeyutl -inkey priv1_pem.key -pkeyopt digest:sha256 -in first.msg > first.sig
 $ openssl ec -in priv1_pem.key -pubout -out pub1_pem.key
 $ openssl pkeyutl -verify -pubin -inkey pub1_pem.key -pkeyopt digest:sha256 -in first.msg -sigfile first.sig
 
