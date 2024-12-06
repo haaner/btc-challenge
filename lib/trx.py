@@ -76,6 +76,7 @@ class ScriptType:
     P2PK = 'P2PK'
     P2PKH = 'P2PKH'
     P2SH = 'P2SH'
+    P2SH_P2WPKH = 'P2SH-P2WPKH'
     P2WPKH = 'P2WPKH'
     P2WSH = 'P2WSH'
     P2TR = 'P2TR'
@@ -147,8 +148,42 @@ class ScriptSig:
                 else:
                     raise Exception('unknown unlocking script')
             
+        elif op_code == '' and script_sig == '': # Native Segwit
+
+            self.type = ScriptType.P2WPKH
+            self.pubKey = self.signature = None # will get filled later when the witness section has been parsed # TODO
+          
+        elif op_code != '': 
+
+            byte_count = int('0x' + op_code, 16);
+            char_count = byte_count * 2
+
+            redeem_script = script_sig[:char_count]
+            
+            script_sig = script_sig[char_count:]
+            if script_sig != '':
+                raise Exception('unknown unlocking / redeem script')
+            
+            op_code, redeem_script = Operation.parseCode(redeem_script)
+
+            if op_code == Operation.ZERO:
+
+                self.type = ScriptType.P2SH_P2WPKH 
+                op_code, self.pubKey = Operation.parseCode(redeem_script)
+                
+                byte_count = int('0x' + op_code, 16);
+                char_count = byte_count * 2
+
+                if len(self.pubKey) != char_count:
+                    raise Exception('pubkey hash length error')
+                
+                self.signature = None # will get filled later when the witness section has been parsed # TODO
+                
+            else:
+                raise Exception('unknown redeem script operation')
+
         else:
-            raise Exception('unknown unlocking script') # TODO Nested Segwit / Native Segwit
+            raise Exception('unknown unlocking script')
 
     def __str__(self):
         return f'{{ {self.raw=}, {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=}, {self.pubKey=} }}'
@@ -195,6 +230,32 @@ class Input:
     
     def __repr__(self):
         return str(self)
+    
+class WitnessItem:
+    def __init__(self, raw):
+        self.raw = raw
+
+        self.byteSize, raw = parseVarint(raw)
+        size_chars = self.byteSize * 2
+        self.item = raw[:size_chars]
+
+        raw = raw[size_chars:]
+
+        self.raw = self.raw[:-len(raw)]
+    
+class Witness:
+    def __init__(self, raw):
+        self.raw = raw
+
+        self.itemCount, raw = parseVarint(raw)
+        self.items: list[WitnessItem] = []
+
+        for i in range(self.itemCount):
+            witness_item = WitnessItem(raw)
+            self.items.append(witness_item)           
+            raw = raw[len(witness_item.raw):]
+            
+        self.raw = self.raw[:-len(raw)]
 
 class ScriptPubKey:
     def __init__(self, raw):
@@ -327,7 +388,7 @@ class PubKeySigMsg:
         if self._pubKeyPoint == None:
             self._pubKeyPoint = Btc.publicKeyHexToPoint(self.pubKey)
 
-        return secp.verifySignature(self._pubKeyPoint, prsz.z, prsz.rs)
+        return secp.verifySignature(self._pubKeyPoint, self.z, self.rs)
         
     def __str__(self):
         return f'{{ {self.pubKey=}, {self.rs=}, {self.z=} }}'
@@ -391,6 +452,16 @@ class Trx:
 
         return raw
     
+    def _parseWitnesses(self, raw: str):
+        self.witnesses: list[Witness] = []
+
+        for i in range(self.inputCount):
+            witness = Witness(raw)
+            self.witnesses.append(witness)
+            raw = raw[len(witness.raw):]
+
+        return raw
+
     def _parseRaw(self):
         raw = self.raw
         raw = raw[8:] # remove version
@@ -398,7 +469,8 @@ class Trx:
         self.usesSegWit = raw.startswith('00')
         if self.usesSegWit:
             raw = raw[4:]
-            raise Exception('segregated witness transactions are not fully implemented')
+
+            #raise Exception('segregated witness transactions are not fully implemented')
     
         self.inputCount, raw = parseVarint(raw)
         raw = self._parseInputs(raw)
@@ -409,9 +481,12 @@ class Trx:
         '''
         self.outputCount, raw = parseVarint(raw)
         raw = self._parseOutputs(raw)
-
-        if not raw.endswith('00000000'):
-            raise Exception('missing transaction end sequence')
+        
+        if self.usesSegWit:
+            raw = self._parseWitnesses(raw)
+            
+        if raw != '00000000':
+            raise Exception('unknown transaction end sequence')
 
     def __str__(self):
         return f'{{ {self.id=}, {self.raw=}, {self.inputCount=}, {self.inputs=}, {self.outputCount=}, {self.outputs=}, {self.usesSegWit=} }}'
