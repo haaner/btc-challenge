@@ -109,31 +109,26 @@ class Btc:
 
         return pk_str
 
-    def publicKeyPointToP2SH(public_key_point: Point):
+    def publicKeyPointToP2SH(public_key_point: Point, for_testnet: bool = False): 
         compressed_public_key = Btc.publicKeyPointToHex(public_key_point, True)
-
         key_hash = hash160(compressed_public_key)
         key_hash = hash160('0014' + key_hash)
 
-        script_hash_hex = '05' + key_hash 
+        network_version_byte = 'c4' if for_testnet else '05'
+        script_hash_hex = network_version_byte + key_hash 
         script_hash_bin = Btc.addDoubleSha256Checksum(bytes(bytearray(script_hash_hex, 'ascii')))
         p2sh_address = base58.b58encode(script_hash_bin).decode('utf-8')
 
         return p2sh_address
+      
+    def publicKeyPointToP2WPKH(public_key_point: Point, for_testnet: bool = False): 
+        compressed_public_key = Btc.publicKeyPointToHex(public_key_point, True)
+        key_hash = hash160(compressed_public_key)
 
-        '''
-        checksum = SHA256.new(SHA256.new(bytes.fromhex(script_hash)).digest()).hexdigest()[:8]
-        p2sh_address = base58.b58encode(bytes.fromhex(script_hash + checksum))
-        '''
+        network_version_str = 'tb' if for_testnet else 'bc'
 
-
-        '''
-        from bech32 import bech32_encode, convertbits
-
-        # Get Bech32 address
-        witness_program = bytes([0x00, 0x14]) + hash160.digest()
-        bech32_address = bech32_encode('bc', convertbits(witness_program, 8, 5))
-        '''
+        from bech32 import encode
+        return encode(network_version_str, 0x00, bytes.fromhex(key_hash))
 
     def publicKeyPointToWif(pubkey: Point, compress: bool = True, for_testnet: bool = False) -> str:
         pk_str = Btc.publicKeyPointToHex(pubkey, compress)
@@ -145,9 +140,7 @@ class Btc:
 
         byte_25_address = Btc.addDoubleSha256Checksum(bytes(bytearray(modified_key_hash, 'ascii')))
 
-        address = base58.b58encode(byte_25_address).decode('utf-8')
-
-        return address
+        return base58.b58encode(byte_25_address).decode('utf-8')
 
     def uncompressPublicKey(pubkey: str) -> str:
         if pubkey[:2] == '04': # the public key is already uncompressed
@@ -235,7 +228,7 @@ class Btc:
 
         return for_testnet, privkey_hex_str 
 
-    def privateKeyToPublicKeyWif(privkey: str) -> str:
+    def privateKeyToPublicKeyAddresses(privkey: str) -> dict:
         for_testnet = False
 
         if len(privkey) == 66: # hex key with network identifier
@@ -255,10 +248,7 @@ class Btc:
         pubkey_address_compressed = Btc.publicKeyPointToWif(pk_point, True, for_testnet) 
         pubkey_address_uncompressed = Btc.publicKeyPointToWif(pk_point, False, for_testnet) 
 
-
-        print('P2SH', Btc.publicKeyPointToP2SH(pk_point))
-        
-        return (pubkey_address_compressed, pubkey_address_uncompressed)
+        return { 'P2PKH-C': pubkey_address_compressed, 'P2PKH-U': pubkey_address_uncompressed, 'P2SH': Btc.publicKeyPointToP2SH(pk_point, for_testnet), 'P2WPKH': Btc.publicKeyPointToP2WPKH(pk_point, for_testnet) }
 
     def wifToHash160(wif: str) -> str:
 
@@ -271,19 +261,22 @@ class Btc:
 ####################################################################################
 
 if __name__ == '__main__':
-    #'''
-    private_hex_key = '7e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113' # without network identifier
-    print(Btc.privateKeyToPublicKeyWif(private_hex_key))
-    exit()
+    
+    for private_hex_key in [ 
+        'efDBFF11E0F2F1AA5089465A591C5E523D1CA92668DED893155CDFABC94CC14E30', # ef -> testnet
+        'ef26F85CE8B2C635AD92F6148E4443FE415F512F3F29F44AB0E2CBDA819295BBD5',
+        'efD9172189D7700FDFB4B6A5C4A83990EAEAFE455441B7D43FF85678EB93AC2713',
+        'L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC',
+        '5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'
+    ]:
+        print(Btc.privateKeyToPublicKeyAddresses(private_hex_key))
 
-    private_wif_key = Btc.privateHexKeyToWif(private_hex_key)
-    print(Btc.privateKeyToPublicKeyWif(private_wif_key))
-
-    print(Btc.privateKeyToPublicKeyWif('L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC'))
-    print(Btc.privateKeyToPublicKeyWif('5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'))
-        
-    print(Btc.wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk')) 
-    #'''
     priv_key = Btc.generatePrivateHexKey()
-    print(priv_key)
-    print(Btc.privateKeyToPublicKeyWif(priv_key))
+    test_priv_key = 'ef' + priv_key
+    main_priv_key = '80' + priv_key
+
+    print(Btc.privateKeyToPublicKeyAddresses(test_priv_key))
+    print(Btc.privateKeyToPublicKeyAddresses(main_priv_key))
+    print(Btc.privateKeyToPublicKeyAddresses(priv_key))
+
+    print(Btc.wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk')) 
