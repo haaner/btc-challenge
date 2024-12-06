@@ -325,7 +325,7 @@ class PubKeySigMsg:
         from secp256k1 import secp
 
         if self._pubKeyPoint == None:
-            self._pubKeyPoint = Btc.publicKeyHexToSecpPoint(self.pubKey)
+            self._pubKeyPoint = Btc.publicKeyHexToPoint(self.pubKey)
 
         return secp.verifySignature(self._pubKeyPoint, prsz.z, prsz.rs)
         
@@ -420,7 +420,7 @@ class Trx:
         return str(self)    
     
     def _getPkMsgs(self):
-        from btc import hash160
+        from btc import doubleSha256
         
         if self._pkMsgs == None:
             
@@ -474,8 +474,8 @@ class Trx:
          
                 #print('msg', raw)            
 
-                # generate hash160 from msg and store it
-                msg_hex = hash160(bytes(bytearray(raw, 'ascii')))
+                # generate doubleSha256 from msg and store it
+                msg_hex = doubleSha256(bytes(bytearray(raw, 'ascii')))
 
                 self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
 
@@ -526,7 +526,7 @@ if __name__ == '__main__':
     #print(prev_trx)
 
     #trx2.getScriptSigMsgs()
-
+    '''
     test_trx = Trx()
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
 
@@ -535,7 +535,8 @@ if __name__ == '__main__':
     for i in range(len(prsz_list)):
         prsz = prsz_list[i]
         print('Is signature correct:', prsz.verify())
-'''
+    '''
+    '''
     prsz_list = test_trx.getPubKeySigMsgList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459')
     prsz = prsz_list[0]  
     
