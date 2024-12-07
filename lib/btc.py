@@ -168,6 +168,12 @@ class Btc:
 
         return Point(int('0x' + pk[:64], 16), int('0x' + pk[64:], 16))
 
+    def publicKeyHexToHash160(pubkey_hex: str) -> str:
+        pkpt = Btc.publicKeyHexToPoint(pubkey_hex)
+        wif = Btc.publicKeyPointToWif(pkpt)
+
+        return Btc.wifToHash160(wif)
+
     def privateHexKeyToWif(privkey_hex: str, compress: bool = True, for_testnet: bool = False) -> str:
         variant = Btc._getPrivateKeyPrefix(for_testnet)
         
@@ -279,4 +285,8 @@ if __name__ == '__main__':
     print(Btc.privateKeyToPublicKeyAddresses(main_priv_key))
     print(Btc.privateKeyToPublicKeyAddresses(priv_key))
 
-    print(Btc.wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk')) 
+    if Btc.wifToHash160('n2ozAmaunMGwPDjtxmZsyxDRjYAJqmZ6Dk') != 'e993470936b573678dc3b997e56db2f9983cb0b4':
+        print("The wif hash is incorrect!") 
+
+    if Btc.publicKeyHexToHash160('02AE68D299CBB8AB99BF24C9AF79A7B13D28AC8CD21F6F7F750300EDA41A589A5D') != '6a721dcca372f3c17b2c649b2ba61aa0fda98a91':
+        print("The pkh hash is incorrect!") 
