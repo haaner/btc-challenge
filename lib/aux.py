@@ -55,7 +55,33 @@ def parseVarint(varint: str) -> tuple[int, str]:
         
     return (intval, varint)
 
+def toVarint(i: int) -> str:
+    
+    if i <= 252:
+        byte_length = 1
+        prefix = ''
+    elif i <= 65535:
+        byte_length = 2
+        prefix = 'fd'
+    elif i <= 4294967295:
+        byte_length = 4
+        prefix = 'fe'
+    elif i <= 18446744073709551615:
+        byte_length = 8
+        prefix = 'ff'
+    else:
+        raise ValueError("Integer is out of range")
+
+    # Konvertiere die Zahl in Bytes und kehre die Byte-Reihenfolge um
+    byte_array = i.to_bytes(byte_length, byteorder='little')
+    hex_string = prefix + byte_array.hex()
+
+    return hex_string
+
 if __name__ == '__main__':
 
     print(parseVarint('fe59cd1e21affe'))
+    print(toVarint(555666777))
+
     print(parseVarint('04affe'))
+    print(toVarint(4))

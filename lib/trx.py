@@ -2,7 +2,8 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from aux import parseVarint
+from aux import parseVarint, toVarint
+from btc import doubleSha256
 
 class Signature:
     def __init__(self, raw):
@@ -97,6 +98,7 @@ class ScriptSig:
         self.endIndex = self.startIndex + len(self.raw)
 
         #print(f"{script_sig=}")
+        self.usesSegwit = False
 
         op_code, script_sig = Operation.parseCode(script_sig)
 
@@ -115,6 +117,7 @@ class ScriptSig:
                 raise Exception('unknown unlocking script')
 
             self.pubKey = None # TODO p2sh: Pay-to-script-hash. The public key(s) are packed into the redeem script which is the last item in scriptSig. To get them you need to parse the redeem script (which itself is a script) and look for key patterns (push of 33 bytes).
+            raise Exception('missing pubKey parsing')
 
             script_sig = script_sig[142:]
             if script_sig != '':
@@ -151,6 +154,8 @@ class ScriptSig:
         elif op_code == '' and script_sig == '': # Native Segwit
 
             self.type = ScriptType.P2WPKH
+            self.usesSegwit = True
+
             self.pubKey = self.signature = None # will get filled later when the witness section has been parsed # TODO
           
         elif op_code != '': 
@@ -169,6 +174,8 @@ class ScriptSig:
             if op_code == Operation.ZERO:
 
                 self.type = ScriptType.P2SH_P2WPKH 
+                self.usesSegwit = True
+
                 op_code, self.pubKey = Operation.parseCode(redeem_script)
                 
                 byte_count = int('0x' + op_code, 16);
@@ -195,38 +202,31 @@ class Input:
     def __init__(self, raw, offset):
         self.raw = raw
 
-        (self.prevTrxId, self.prevTrxVout), raw = self._extractPreviousTrxIdVout(raw)
-
-        #spk = self._extractScriptPubKey(*trx_prev_id_vout)
+        # extract prev trx id and reverse its byte order
+        self.prevTrxIdLittle = raw[:64]
+        raw = raw[64:]
+        self.prevTrxIdBig = int('0x' + self.prevTrxIdLittle, 16).to_bytes(32, byteorder='little').hex()
+        
+        # extract prev trx vout and reverse its byte order
+        self.prevTrxVoutLittle = raw[:8]
+        raw = raw[8:] 
+        prev_trx_vout_big = int('0x' + self.prevTrxVoutLittle, 16).to_bytes(4, byteorder='little').hex()
+    
+        self.prevTrxVout = int('0x' + prev_trx_vout_big, 16) # convert vout to integer
+       
+        # determine the offset of the sigscript relative to the beginning of the input
         offset2 = len(self.raw) - len(raw)
         self.sigScript = ScriptSig(raw, offset + offset2)
 
         self.raw = self.raw[:offset2 + len(self.sigScript.raw) + 8]
 
         # check the locktime end sequence
-        end_sequence = self.raw[-8:]
-        if end_sequence != 'ffffffff':
-            raise Exception('unknown input locktime end sequence')       
+        self.endSequence = self.raw[-8:]
+        if self.endSequence not in [ 'ffffffff', 'feffffff' , 'fdffffff' ]:
+            raise Exception('unknown input locktime / rbf end sequence')       
 
-    @staticmethod
-    def _extractPreviousTrxIdVout(trx: str):
-
-        # extract prev trx id and reverse its byte order
-        prev_trx_id = trx[:64]
-        trx = trx[64:]
-        prev_trx_id_rev = int('0x' + prev_trx_id, 16).to_bytes(32, byteorder='little').hex()
-        
-        # extract prev trx vout and reverse its byte order
-        prev_trx_vout = trx[:8]
-        trx = trx[8:] 
-        prev_trx_vout_rev = int('0x' + prev_trx_vout, 16).to_bytes(4, byteorder='little').hex()
-    
-        prev_trx_vout_rev_int = int('0x' + prev_trx_vout_rev, 16) # convert vout to integer
-
-        return ((prev_trx_id_rev, prev_trx_vout_rev_int), trx)    
-    
     def __str__(self):
-        return f'{{ {self.raw=}, {self.prevTrxId=}, {self.prevTrxVout=}, {self.sigScript=} }}'
+        return f'{{ {self.raw=}, {self.prevTrxIdBig=}, {self.prevTrxVout=}, {self.sigScript=} }}'
     
     def __repr__(self):
         return str(self)
@@ -355,10 +355,10 @@ class Output:
     def __init__(self, raw):
         self.raw = raw
 
-        satoshis_hex = raw[:16]
+        self.satoshisBig = raw[:16]
         raw = raw[16:] 
-        satoshis_hex_rev = int('0x' + satoshis_hex, 16).to_bytes(8, byteorder='little').hex()
-        self.satoshis =  int('0x' + satoshis_hex_rev, 16)
+        satoshis_hex_rev = int('0x' + self.satoshisBig, 16).to_bytes(8, byteorder='little').hex()
+        self.satoshis = int('0x' + satoshis_hex_rev, 16)
 
         output_bytes, raw = parseVarint(raw)
         output_len = output_bytes * 2
@@ -420,10 +420,6 @@ class Trx:
 
         self._pkMsgs = None
         
-    @staticmethod
-    def _extractScriptPubKey(trx_id: str, vout: int):
-        pass # TODO
-
     def _parseInputs(self, raw: str):
         offset = len(self.raw) - len(raw)
 
@@ -453,6 +449,7 @@ class Trx:
         return raw
     
     def _parseWitnesses(self, raw: str):
+        self._witnessRaw = raw
         self.witnesses: list[Witness] = []
 
         for i in range(self.inputCount):
@@ -460,11 +457,14 @@ class Trx:
             self.witnesses.append(witness)
             raw = raw[len(witness.raw):]
 
+        self._witnessRaw = self._witnessRaw[:-len(raw)]
         return raw
 
     def _parseRaw(self):
         raw = self.raw
-        raw = raw[8:] # remove version
+
+        self.version = raw[:8]
+        raw = raw[8:] 
     
         self.usesSegWit = raw.startswith('00')
         if self.usesSegWit:
@@ -484,8 +484,18 @@ class Trx:
         
         if self.usesSegWit:
             raw = self._parseWitnesses(raw)
-            
-        if raw != '00000000':
+
+            for i in range(self.inputCount):
+                input = self.inputs[i]
+                
+                if input.sigScript.usesSegwit:
+                    witness_items = self.witnesses[i].items
+                    input.sigScript.signature = Signature(witness_items[0].item) 
+
+                    if input.sigScript.pubKey == None: # In der zu signierenden Message ist nur der pubKey-Hash relevant, Nested-SegWit Inputs liefern diesen bereits in der Input-Sektion, deshalb muss nur bei Native-SegWit Inputs tatsächlich was gemacht werden
+                        input.sigScript.pubKey = witness_items[1].item 
+
+        if raw != '00000000': #len(raw) != 8: # default is '00000000' => no locktime
             raise Exception('unknown transaction end sequence')
 
     def __str__(self):
@@ -520,39 +530,100 @@ class Trx:
             self._pkMsgs = []
             for i in range(self.inputCount):
                 raw = self.raw
-                
+
+                if self.usesSegWit: # remove the witness section
+                    raw = raw[:-len(self._witnessRaw)]
+
+                # remove the locktime sequence
+                raw = raw[:-8]
+            
                 input = self.inputs[i]
 
-                # get the script pubkey of the prev_trx vout
-                prev_trx = Trx(input.prevTrxId, self.isTest)
-                prev_trx_output = prev_trx.outputs[input.prevTrxVout]   
+                if not input.sigScript.usesSegwit:
 
-                prev_trx_output_script_pubkey = prev_trx_output.scriptPubKey.raw
-                pubkey_byte_len_hex = hex(len(prev_trx_output_script_pubkey) >> 1)[2:] # the half length is the byte length; remove 0x
+                    # get the script pubkey of the prev_trx vout
+                    prev_trx = Trx(input.prevTrxIdBig, self.isTest)
+                    prev_trx_output = prev_trx.outputs[input.prevTrxVout]   
 
-                #print('19 or not', f'{pubkey_byte_len_hex=}')
-        
-                for script_sig_start_index2, script_sig_end_index2 in sig_script_indices_reversed:
+                    prev_trx_output_script_pubkey = prev_trx_output.scriptPubKey.raw
+                    pubkey_byte_len_hex = hex(len(prev_trx_output_script_pubkey) >> 1)[2:] # the half length is the byte length; remove 0x
 
-                    raw_first = raw[:script_sig_start_index2]
-                    raw_second = raw[script_sig_end_index2:]
+                    #print('19 or not', f'{pubkey_byte_len_hex=}')
+            
+                    for script_sig_start_index2, script_sig_end_index2 in sig_script_indices_reversed:
 
-                    if script_sig_start_index2 == input.sigScript.startIndex:
-                        # insert pubkey length and pubkey
-                        insertion = pubkey_byte_len_hex + prev_trx_output_script_pubkey 
-                    else: # replace other script sigs with 0x0
-                        insertion = '00'
+                        raw_first = raw[:script_sig_start_index2]
+                        raw_second = raw[script_sig_end_index2:]
+
+                        if script_sig_start_index2 == input.sigScript.startIndex:
+                            # insert pubkey length and pubkey
+                            insertion = pubkey_byte_len_hex + prev_trx_output_script_pubkey 
+                        else: # replace other script sigs with 0x0
+                            insertion = '00'
+                    
+                        raw = raw_first + insertion + raw_second
+
+                    raw += '00000000' # add the default locktime sequence
+                    raw += input.sigScript.signature.hashingSequence # add the SIGHASH sequence
+
+                    if self.usesSegWit:
+                        # remove the segwit 2-byte sequence after the version
+                        raw_first = raw[:8]
+                        raw_second = raw[8 + 4:]
+                        raw = raw_first + raw_second
+
+                else: # segwit input
+                    
+                    msg = self.version
+
+                    prevouts = ''
+                    hash_sequence = ''
+                    for j in range(self.inputCount):
+                        input_j = self.inputs[j]
+                        prevouts += input_j.prevTrxIdLittle + input_j.prevTrxVoutLittle
+                        hash_sequence += input_j.endSequence
+
+                    msg += doubleSha256(bytes(bytearray(prevouts, 'ascii'))).decode()
+                    msg += doubleSha256(bytes(bytearray(hash_sequence, 'ascii'))).decode()
+
+                    msg += input.prevTrxIdLittle + input.prevTrxVoutLittle
+                    
+                    prev_trx = Trx(input.prevTrxIdBig, self.isTest)
+                    prev_output = prev_trx.outputs[input.prevTrxVout]
+
+                    if input.sigScript.type == ScriptType.P2WPKH:
+                        script = Operation.DUP + Operation.HASH160 + Operation.PUSHBYTES_20 + prev_output.scriptPubKey.pubKey + Operation.EQUALVERIFY + Operation.CHECKSIG
+                        script_len = toVarint(len(script) // 2)
+                        
+                        msg += script_len + script
+                    else:
+                        raise Exception('missing code')
+                    
+                    msg += prev_output.satoshisBig
+                    msg += input.endSequence
+
+                    outs = ''
+                    for j in range(self.outputCount):
+                        output = self.outputs[j]
+                        script = output.scriptPubKey.raw
+                        script_len = toVarint(len(script) // 2)
+                        outs += output.satoshisBig + script_len + script
+
+                    msg += doubleSha256(bytes(bytearray(outs, 'ascii'))).decode()
+
+
+                    pass
+
+                                          
+                print('msg', raw)        
                 
-                    raw = raw_first + insertion + raw_second
-
-                raw += input.sigScript.signature.hashingSequence # add the SIGHASH sequence
-         
-                #print('msg', raw)            
 
                 # generate doubleSha256 from msg and store it
                 msg_hex = doubleSha256(bytes(bytearray(raw, 'ascii')))
 
                 self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
+
+        exit()    
 
         return self._pkMsgs
     
