@@ -1,0 +1,1 @@
+# TODO: Get all outgoing trx from an UTxO and extract the corresponding rsz tupels

@@ -156,7 +156,7 @@ class ScriptSig:
             self.type = ScriptType.P2WPKH
             self.usesSegwit = True
 
-            self.pubKey = self.signature = None # will get filled later when the witness section has been parsed # TODO
+            self.pubKey = self.signature = None # will get filled later when the witness section has been parsed
           
         elif op_code != '': 
 
@@ -176,7 +176,7 @@ class ScriptSig:
                 self.type = ScriptType.P2SH_P2WPKH 
                 self.usesSegwit = True
 
-                op_code, self.pubKey = Operation.parseCode(redeem_script)
+                op_code, self.pubKey = Operation.parseCode(redeem_script) # this only the hash of the pubkey, the actual key will get filled later when the witness section has been parsed
                 
                 byte_count = int('0x' + op_code, 16);
                 char_count = byte_count * 2
@@ -184,7 +184,7 @@ class ScriptSig:
                 if len(self.pubKey) != char_count:
                     raise Exception('pubkey hash length error')
                 
-                self.signature = None # will get filled later when the witness section has been parsed # TODO
+                self.signature = None # will get filled later when the witness section has been parsed
                 
             else:
                 raise Exception('unknown redeem script operation')
@@ -678,6 +678,11 @@ class Trx:
                 prsz.append(PubKeySigMsg(p, rs, msg))    
 
         return prsz
+    
+    @staticmethod
+    def create(private_key_wifs: list[str], bech32_satoshis: list[tuple[str, int]]):
+        pass # TODO create a fully native segwit transaction 
+        # TODO Inform about of fees and UTxO losses when not all gets outputed!
 
 if __name__ == '__main__':
     
