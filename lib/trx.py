@@ -568,7 +568,7 @@ class Trx:
         msg += doubleSha256(outs)
         msg += self.locktime + input.sigScript.signature.hashingSequence     
 
-        return msg   
+        return input.sigScript.pubKey, msg   
 
     def _getPkMsgs(self):
         from btc import doubleSha256
@@ -633,15 +633,17 @@ class Trx:
                         raw_second = raw[8 + 4:]
                         raw = raw_first + raw_second
 
+                    pub_key = prev_trx_output.scriptPubKey.pubKey
+
                 else: # segwit input
-                    raw = self._createSegWitMsg(input)
+                    pub_key, raw = self._createSegWitMsg(input)
                                           
                 #print('msg', raw)        
 
                 # generate doubleSha256 from msg and store it
                 msg_hex = doubleSha256(raw)
 
-                self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
+                self._pkMsgs.append((pub_key, int(msg_hex, 16)))
 
         return self._pkMsgs
     
@@ -678,7 +680,7 @@ class Trx:
         return prsz
 
 if __name__ == '__main__':
-
+    
     test_trx = Trx()
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
     test_trx_vrfy = Trx('d1a92ad68a031c5324981aa920152bd16975686905db41e3fc9d51c7ff4a20ed', True)
@@ -691,8 +693,6 @@ if __name__ == '__main__':
     for i in range(len(prsz_list)):
         prsz = prsz_list[i]
         print('Is signature correct:', prsz.verify())
-  
-    print(test_trx)
 
     test2_trx = Trx()
     test2_trx.setRaw('02000000000103ed204affc7519dfce341db0569687569d12b1520a91a9824531c038ad62aa9d1010000006a47304402200da2c4d8f2f44a8154fe127fe5bbe93be492aa589870fe77eb537681bc29c8ec02201eee7504e37db2ef27fa29afda46b6c331cd1a651bb6fa5fd85dcf51ac01567a01210242BF11B788DDFF450C791F16E83465CC67328CA945C703469A08E37EF0D0E061ffffffff9cb872539fbe1bc0b9c5562195095f3f35e6e13919259956c6263c9bd53b20b70100000000ffffffff8012f1ec8aa9a63cf8b200c25ddae2dece42a2495cc473c1758972cfcd84d90401000000171600146a721dcca372f3c17b2c649b2ba61aa0fda98a91ffffffff01b580f50000000000160014cb61ee4568082cb59ac26bb96ec8fbe0109a4c000002483045022100f8dac321b0429798df2952d086e763dd5b374d031c7f400d92370ae3c5f57afd0220531207b28b1b137573941c7b3cf5384a3658ef5fc238d26150d8f75b2bcc61e70121025972A1F2532B44348501075075B31EB21C02EEF276B91DB99D30703F2081B7730247304402204ebf033caf3a1a210623e98b49acb41db2220c531843106d5c50736b144b15aa02201a006be1ebc2ffef0927d4458e3bb5e41e5abc7e44fc5ceb920049b46f879711012102AE68D299CBB8AB99BF24C9AF79A7B13D28AC8CD21F6F7F750300EDA41A589A5D00000000', True)
@@ -706,9 +706,7 @@ if __name__ == '__main__':
     for i in range(len(prsz_list)):
         prsz = prsz_list[i]
         print('Is signature correct:', prsz.verify())
-
-    print(test2_trx)
-
+    
     '''
     prsz_list = test_trx.getPubKeySigMsgList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459')
     prsz = prsz_list[0]  
