@@ -259,7 +259,14 @@ class Witness:
 
 class ScriptPubKey:
     def __init__(self, raw):
-        self.raw  = raw
+        self.raw = raw
+
+        script_bytes, raw = parseVarint(raw)
+        script_char_len = script_bytes * 2
+
+        self.raw = self.raw[:len(self.raw) - len(raw) + script_char_len]
+
+        raw = raw[:script_char_len]
 
         op_code, raw = Operation.parseCode(raw)
 
@@ -343,7 +350,8 @@ class ScriptPubKey:
         else:
             raise Exception('unknown locking script')     
 
-        self.raw = self.raw[:len(self.raw) - len(raw)]           
+        if raw != '':
+            raise Exception('scriptPubKey length mismatch')
         
     def __str__(self):
         return f'{{ {self.raw=}, {self.type=}, {self.pubKey=} }}'
@@ -360,13 +368,11 @@ class Output:
         satoshis_hex_rev = int('0x' + self.satoshisBig, 16).to_bytes(8, byteorder='little').hex()
         self.satoshis = int('0x' + satoshis_hex_rev, 16)
 
-        output_bytes, raw = parseVarint(raw)
-        output_len = output_bytes * 2
-        self.scriptPubKey = ScriptPubKey(raw[:output_len]);
+        self.scriptPubKey = ScriptPubKey(raw);
 
-        raw = raw[output_len:]
+        raw = raw[len(self.scriptPubKey.raw):]
 
-        self.raw = self.raw[:len(self.raw) - len(raw)]
+        self.raw = self.raw[:-len(raw)]
   
     def __str__(self):
         return f'{{ {self.raw=}, {self.satoshis=}, {self.scriptPubKey=} }}'
@@ -545,11 +551,6 @@ class Trx:
                     prev_trx = Trx(input.prevTrxIdBig, self.isTest)
                     prev_trx_output = prev_trx.outputs[input.prevTrxVout]   
 
-                    prev_trx_output_script_pubkey = prev_trx_output.scriptPubKey.raw
-                    pubkey_byte_len_hex = hex(len(prev_trx_output_script_pubkey) >> 1)[2:] # the half length is the byte length; remove 0x
-
-                    #print('19 or not', f'{pubkey_byte_len_hex=}')
-            
                     for script_sig_start_index2, script_sig_end_index2 in sig_script_indices_reversed:
 
                         raw_first = raw[:script_sig_start_index2]
@@ -557,7 +558,7 @@ class Trx:
 
                         if script_sig_start_index2 == input.sigScript.startIndex:
                             # insert pubkey length and pubkey
-                            insertion = pubkey_byte_len_hex + prev_trx_output_script_pubkey 
+                            insertion = prev_trx_output.scriptPubKey.raw 
                         else: # replace other script sigs with 0x0
                             insertion = '00'
                     
@@ -605,9 +606,7 @@ class Trx:
                     outs = ''
                     for j in range(self.outputCount):
                         output = self.outputs[j]
-                        script = output.scriptPubKey.raw
-                        script_len = toVarint(len(script) // 2)
-                        outs += output.satoshisBig + script_len + script
+                        outs += output.satoshisBig + output.scriptPubKey.raw
 
                     msg += doubleSha256(outs)
 
