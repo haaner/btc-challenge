@@ -583,8 +583,8 @@ class Trx:
                         prevouts += input_j.prevTrxIdLittle + input_j.prevTrxVoutLittle
                         hash_sequence += input_j.endSequence
 
-                    msg += doubleSha256(bytes(bytearray(prevouts, 'ascii'))).decode()
-                    msg += doubleSha256(bytes(bytearray(hash_sequence, 'ascii'))).decode()
+                    msg += doubleSha256(prevouts)
+                    msg += doubleSha256(hash_sequence)
 
                     msg += input.prevTrxIdLittle + input.prevTrxVoutLittle
                     
@@ -609,7 +609,7 @@ class Trx:
                         script_len = toVarint(len(script) // 2)
                         outs += output.satoshisBig + script_len + script
 
-                    msg += doubleSha256(bytes(bytearray(outs, 'ascii'))).decode()
+                    msg += doubleSha256(outs)
 
 
                     pass
@@ -619,7 +619,7 @@ class Trx:
                 
 
                 # generate doubleSha256 from msg and store it
-                msg_hex = doubleSha256(bytes(bytearray(raw, 'ascii')))
+                msg_hex = doubleSha256(raw)
 
                 self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
 

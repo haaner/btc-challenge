@@ -16,15 +16,15 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-def doubleSha256(hex: bytes) -> bytes:
-    """Returns the hex input doubleSha256'ed hex bytes"""
+def doubleSha256(hex: str) -> str:
+    """Returns the hex'd doubleSha256 of the hex input string"""
 
     bin = codecs.decode(hex, 'hex')
 
     hash = hashlib.sha256(bin).digest()
     hash2 = hashlib.sha256(hash).digest()
 
-    return codecs.encode(hash2, 'hex')
+    return codecs.encode(hash2, 'hex').decode()
 
 def hash160(hex_str: str):
     bin = codecs.decode(hex_str, 'hex') 
@@ -51,7 +51,7 @@ class Btc:
     def _isTestNetKeyPrefix(str: str):
         return Btc.PRIVATE_KEY_PREFIX_TESTNET[str]   
     
-    def addDoubleSha256Checksum(hex: bytes) -> bytes:
+    def addDoubleSha256Checksum(hex: str) -> bytes:
         """Attaches the first 4 bytes of the double sha256 checksum of the hex bytes input to its end and returns the result as binary bytes"""
 
         hash2_hex = doubleSha256(hex)
@@ -63,11 +63,11 @@ class Btc:
     def uncompressPrivateKey(privkey_wif_compressed: str) -> str:
 
         privkey_bin = base58.b58decode(privkey_wif_compressed)
-        privkey_hex = codecs.encode(privkey_bin, 'hex')
+        privkey_hex = codecs.encode(privkey_bin, 'hex').decode()
 
         privkey_hex = privkey_hex[:-8] # remove the checksum
 
-        if privkey_hex.endswith(b"01"): # The private key indicates that the public key should get compressed 
+        if privkey_hex.endswith('01'): # The private key indicates that the public key should get compressed 
             privkey_hex = privkey_hex[:-2]
             privkey_bin = Btc.addDoubleSha256Checksum(privkey_hex)
 
@@ -116,7 +116,7 @@ class Btc:
 
         network_version_byte = 'c4' if for_testnet else '05'
         script_hash_hex = network_version_byte + key_hash 
-        script_hash_bin = Btc.addDoubleSha256Checksum(bytes(bytearray(script_hash_hex, 'ascii')))
+        script_hash_bin = Btc.addDoubleSha256Checksum(script_hash_hex)
         p2sh_address = base58.b58encode(script_hash_bin).decode('utf-8')
 
         return p2sh_address
@@ -138,7 +138,7 @@ class Btc:
         network_version_byte = '6f' if for_testnet else '00'
         modified_key_hash = network_version_byte + key_hash
 
-        byte_25_address = Btc.addDoubleSha256Checksum(bytes(bytearray(modified_key_hash, 'ascii')))
+        byte_25_address = Btc.addDoubleSha256Checksum(modified_key_hash)
 
         return base58.b58encode(byte_25_address).decode('utf-8')
 
@@ -181,9 +181,7 @@ class Btc:
         
         if compress: privkey_hex += '01'
 
-        privkey_bytes = bytes(bytearray(privkey_hex, 'ascii'))
-
-        privkey_bin = Btc.addDoubleSha256Checksum(privkey_bytes)
+        privkey_bin = Btc.addDoubleSha256Checksum(privkey_hex)
         privkey_wif = base58.b58encode(privkey_bin).decode('utf-8')
 
         return privkey_wif
