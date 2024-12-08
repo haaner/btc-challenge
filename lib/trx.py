@@ -3,7 +3,7 @@ if __package__:
     sys.path.append(path.dirname(path.abspath(__file__)))
 
 from aux import parseVarint, toVarint
-from btc import doubleSha256
+from btc import doubleSha256, hash160
 
 class Signature:
     def __init__(self, raw):
@@ -45,7 +45,7 @@ class Signature:
         self.hashingSequence = int('0x' + raw, 16).to_bytes(4, byteorder='little').hex()
 
     def __str__(self):
-        return f'{{ {self.raw=}, {self.r=}, {self.s=}, {self.hashingSequence=} }}'
+        return f'{{ {self.r=}, {self.s=}, {self.hashingSequence=} }}'
     
     def __repr__(self):
         return str(self)        
@@ -192,8 +192,16 @@ class ScriptSig:
         else:
             raise Exception('unknown unlocking script')
 
+        self._pubKeyHash = None
+
+    def getPubKeyHash(self):
+        if self._pubKeyHash == None and self.pubKey != None:
+            self._pubKeyHash = hash160(self.pubKey)
+        
+        return self._pubKeyHash
+
     def __str__(self):
-        return f'{{ {self.raw=}, {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=}, {self.pubKey=} }}'
+        return f'{{ {self.startIndex=}, {self.endIndex=}, {self.type=}, {self.signature=}, {self.pubKey=} }}'
     
     def __repr__(self):
         return str(self)
@@ -220,13 +228,13 @@ class Input:
 
         self.raw = self.raw[:offset2 + len(self.sigScript.raw) + 8]
 
-        # check the locktime end sequence
+        # check the end sequence
         self.endSequence = self.raw[-8:]
         if self.endSequence not in [ 'ffffffff', 'feffffff' , 'fdffffff' ]:
             raise Exception('unknown input locktime / rbf end sequence')       
 
     def __str__(self):
-        return f'{{ {self.raw=}, {self.prevTrxIdBig=}, {self.prevTrxVout=}, {self.sigScript=} }}'
+        return f'{{ {self.prevTrxIdBig=}, {self.prevTrxVout=}, {self.sigScript=} }}'
     
     def __repr__(self):
         return str(self)
@@ -235,13 +243,19 @@ class WitnessItem:
     def __init__(self, raw):
         self.raw = raw
 
-        self.byteSize, raw = parseVarint(raw)
-        size_chars = self.byteSize * 2
+        size_bytes, raw = parseVarint(raw)
+        size_chars = size_bytes * 2
         self.item = raw[:size_chars]
 
         raw = raw[size_chars:]
 
         self.raw = self.raw[:-len(raw)]
+
+    def __str__(self):
+        return self.item
+    
+    def __repr__(self):
+        return str(self)         
     
 class Witness:
     def __init__(self, raw):
@@ -257,6 +271,12 @@ class Witness:
             
         self.raw = self.raw[:-len(raw)]
 
+    def __str__(self):
+        return f'{{ {self.itemCount=}, {self.items=} }}'
+    
+    def __repr__(self):
+        return str(self)   
+    
 class ScriptPubKey:
     def __init__(self, raw):
         self.raw = raw
@@ -354,7 +374,7 @@ class ScriptPubKey:
             raise Exception('scriptPubKey length mismatch')
         
     def __str__(self):
-        return f'{{ {self.raw=}, {self.type=}, {self.pubKey=} }}'
+        return f'{{ {self.type=}, {self.pubKey=} }}'
     
     def __repr__(self):
         return str(self)
@@ -375,7 +395,7 @@ class Output:
         self.raw = self.raw[:-len(raw)]
   
     def __str__(self):
-        return f'{{ {self.raw=}, {self.satoshis=}, {self.scriptPubKey=} }}'
+        return f'{{ {self.satoshis=}, {self.scriptPubKey=} }}'
     
     def __repr__(self):
         return str(self)    
@@ -497,19 +517,59 @@ class Trx:
                 if input.sigScript.usesSegwit:
                     witness_items = self.witnesses[i].items
                     input.sigScript.signature = Signature(witness_items[0].item) 
+                    input.sigScript.pubKey = witness_items[1].item 
+        else:
+            self.witnesses = None
 
-                    if input.sigScript.pubKey == None: # In der zu signierenden Message ist nur der pubKey-Hash relevant, Nested-SegWit Inputs liefern diesen bereits in der Input-Sektion, deshalb muss nur bei Native-SegWit Inputs tatsächlich was gemacht werden
-                        input.sigScript.pubKey = witness_items[1].item 
-
-        if raw != '00000000': #len(raw) != 8: # default is '00000000' => no locktime
-            raise Exception('unknown transaction end sequence')
+        self.locktime = raw
+        if len(self.locktime) != 8: # default is '00000000' => no locktime            
+            raise Exception('unknown locktime sequence')
 
     def __str__(self):
-        return f'{{ {self.id=}, {self.raw=}, {self.inputCount=}, {self.inputs=}, {self.outputCount=}, {self.outputs=}, {self.usesSegWit=} }}'
+        return f'{{ {self.id=}, {self.inputCount=}, {self.inputs=}, {self.outputCount=}, {self.outputs=}, {self.witnesses=} }}'
     
     def __repr__(self):
         return str(self)    
     
+    def _createSegWitMsg(self, input: Input):
+        msg = self.version
+
+        prevouts = ''
+        hash_sequence = ''
+        for j in range(self.inputCount):
+            input_j = self.inputs[j]
+            prevouts += input_j.prevTrxIdLittle + input_j.prevTrxVoutLittle
+            hash_sequence += input_j.endSequence
+
+        msg += doubleSha256(prevouts)
+        msg += doubleSha256(hash_sequence)
+
+        msg += input.prevTrxIdLittle + input.prevTrxVoutLittle
+       
+        if input.sigScript.type in [ ScriptType.P2WPKH, ScriptType.P2SH_P2WPKH ]:
+            script = Operation.DUP + Operation.HASH160 + Operation.PUSHBYTES_20 + input.sigScript.getPubKeyHash() + Operation.EQUALVERIFY + Operation.CHECKSIG
+            script_len = toVarint(len(script) // 2)
+            
+            msg += script_len + script
+        else:
+            raise Exception('missing code')
+        
+        prev_trx = Trx(input.prevTrxIdBig, self.isTest)
+        prev_output = prev_trx.outputs[input.prevTrxVout]
+
+        msg += prev_output.satoshisBig
+        msg += input.endSequence
+
+        outs = ''
+        for j in range(self.outputCount):
+            output = self.outputs[j]
+            outs += output.satoshisBig + output.scriptPubKey.raw
+
+        msg += doubleSha256(outs)
+        msg += self.locktime + input.sigScript.signature.hashingSequence     
+
+        return msg   
+
     def _getPkMsgs(self):
         from btc import doubleSha256
         
@@ -564,7 +624,7 @@ class Trx:
                     
                         raw = raw_first + insertion + raw_second
 
-                    raw += '00000000' # add the default locktime sequence
+                    raw += self.locktime # add the locktime sequence
                     raw += input.sigScript.signature.hashingSequence # add the SIGHASH sequence
 
                     if self.usesSegWit:
@@ -574,55 +634,14 @@ class Trx:
                         raw = raw_first + raw_second
 
                 else: # segwit input
-                    
-                    msg = self.version
-
-                    prevouts = ''
-                    hash_sequence = ''
-                    for j in range(self.inputCount):
-                        input_j = self.inputs[j]
-                        prevouts += input_j.prevTrxIdLittle + input_j.prevTrxVoutLittle
-                        hash_sequence += input_j.endSequence
-
-                    msg += doubleSha256(prevouts)
-                    msg += doubleSha256(hash_sequence)
-
-                    msg += input.prevTrxIdLittle + input.prevTrxVoutLittle
-                    
-                    prev_trx = Trx(input.prevTrxIdBig, self.isTest)
-                    prev_output = prev_trx.outputs[input.prevTrxVout]
-
-                    if input.sigScript.type == ScriptType.P2WPKH:
-                        script = Operation.DUP + Operation.HASH160 + Operation.PUSHBYTES_20 + prev_output.scriptPubKey.pubKey + Operation.EQUALVERIFY + Operation.CHECKSIG
-                        script_len = toVarint(len(script) // 2)
-                        
-                        msg += script_len + script
-                    else:
-                        raise Exception('missing code')
-                    
-                    msg += prev_output.satoshisBig
-                    msg += input.endSequence
-
-                    outs = ''
-                    for j in range(self.outputCount):
-                        output = self.outputs[j]
-                        outs += output.satoshisBig + output.scriptPubKey.raw
-
-                    msg += doubleSha256(outs)
-
-
-                    pass
-
+                    raw = self._createSegWitMsg(input)
                                           
-                print('msg', raw)        
-                
+                #print('msg', raw)        
 
                 # generate doubleSha256 from msg and store it
                 msg_hex = doubleSha256(raw)
 
                 self._pkMsgs.append((prev_trx_output.scriptPubKey.pubKey, int(msg_hex, 16)))
-
-        exit()    
 
         return self._pkMsgs
     
@@ -660,27 +679,36 @@ class Trx:
 
 if __name__ == '__main__':
 
-    #trx1 = Trx('a3cf0c4dd6c5dc905936785fa1685cce5c7f99970bae4f2bd417896967c2b305')
-    #print(trx1)
-
-    #trx2 = Trx()
-    #trx2.setRaw('01000000012fc93dc03d05e450603e354be409cba8e74a75aece39e0e72ce32fe288350972010000006b483045022100c378e5e472769ea116ee84f24917d245659e3596c71a66a4ae75cb9f9fa046d702204b3942cc040ea596f9e9950775c5165b379a5f6857137d8d921c39978b6fa5ee012102bf8135821ba2d6a13a0028f405e55b0e8262f683f59f6b4b348bcc043185efa5ffffffff02394012000000000017a914847d516dc58631a6ec2b87d60854aae894b52c9e87f23a29000000000017a914a047f94cd407ae34820bdf81070da1a2955174098700000000') 
-    #print(trx2)
-    
-    #prev_trx = Trx('72093588e22fe32ce7e039ceae754ae7a8cb09e44b353e6050e4053dc03dc92f')
-    #print(prev_trx)
-
-    #trx2.getScriptSigMsgs()
-    '''
     test_trx = Trx()
     test_trx.setRaw('020000000255a736179f5ee498660f33ca6f4ce017ed8ad4bd286c162400d215f3c5a876af000000006b483045022100f33bb5984ca59d24fc032fe9903c1a8cb750e809c3f673d71131b697fd13289402201d372ec7b6dc6fda49df709a4b53d33210bfa61f0845e3253cd3e3ce2bed817e012102EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459ffffffff4d89764cf5490ac5023cb55cd2a0ecbfd238a216de62f4fd49154253f1a75092020000006a47304402201f055eb8374aca9b779dd7f8dc91e0afb609ac61cd5cb9ad1f9ca0359c3d134a022019c45145919394096e42963b7e9b6538cdb303a30c6ff0f17b8b0cfb1e897f5a01210333D23631BC450AAF925D685794903576BBC8B20007CF334C0EA6C7E2C0FAB2BAffffffff0200e20400000000001976a914e993470936b573678dc3b997e56db2f9983cb0b488ac20cb0000000000001976a914b780d54c6b03b053916333b50a213d566bbedd1388ac00000000', True)
+    test_trx_vrfy = Trx('d1a92ad68a031c5324981aa920152bd16975686905db41e3fc9d51c7ff4a20ed', True)
+
+    if test_trx.raw.lower() != test_trx_vrfy.raw:
+        raise Exception('trx is flawed')
 
     prsz_list = test_trx.getPubKeySigMsgList()
 
     for i in range(len(prsz_list)):
         prsz = prsz_list[i]
         print('Is signature correct:', prsz.verify())
-    '''
+  
+    print(test_trx)
+
+    test2_trx = Trx()
+    test2_trx.setRaw('02000000000103ed204affc7519dfce341db0569687569d12b1520a91a9824531c038ad62aa9d1010000006a47304402200da2c4d8f2f44a8154fe127fe5bbe93be492aa589870fe77eb537681bc29c8ec02201eee7504e37db2ef27fa29afda46b6c331cd1a651bb6fa5fd85dcf51ac01567a01210242BF11B788DDFF450C791F16E83465CC67328CA945C703469A08E37EF0D0E061ffffffff9cb872539fbe1bc0b9c5562195095f3f35e6e13919259956c6263c9bd53b20b70100000000ffffffff8012f1ec8aa9a63cf8b200c25ddae2dece42a2495cc473c1758972cfcd84d90401000000171600146a721dcca372f3c17b2c649b2ba61aa0fda98a91ffffffff01b580f50000000000160014cb61ee4568082cb59ac26bb96ec8fbe0109a4c000002483045022100f8dac321b0429798df2952d086e763dd5b374d031c7f400d92370ae3c5f57afd0220531207b28b1b137573941c7b3cf5384a3658ef5fc238d26150d8f75b2bcc61e70121025972A1F2532B44348501075075B31EB21C02EEF276B91DB99D30703F2081B7730247304402204ebf033caf3a1a210623e98b49acb41db2220c531843106d5c50736b144b15aa02201a006be1ebc2ffef0927d4458e3bb5e41e5abc7e44fc5ceb920049b46f879711012102AE68D299CBB8AB99BF24C9AF79A7B13D28AC8CD21F6F7F750300EDA41A589A5D00000000', True)
+    test2_trx_vrfy = Trx('65eb5594eda20b3a2437c2e2c28ba7633f0492cbb33f62ee31469b913ce8a5ca', True)
+
+    if test2_trx.raw.lower() != test2_trx_vrfy.raw:
+        raise Exception('trx is flawed')
+
+    prsz_list = test2_trx.getPubKeySigMsgList()
+
+    for i in range(len(prsz_list)):
+        prsz = prsz_list[i]
+        print('Is signature correct:', prsz.verify())
+
+    print(test2_trx)
+
     '''
     prsz_list = test_trx.getPubKeySigMsgList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459')
     prsz = prsz_list[0]  
@@ -704,5 +732,4 @@ if __name__ == '__main__':
 
     for i in range(len(prsz_list)):
         prsz = prsz_list[i]
-        
         print('Is signature correct:', prsz.verify())
