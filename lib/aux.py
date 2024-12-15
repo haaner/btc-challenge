@@ -31,6 +31,9 @@ def inverseMod(k: int, p: int) -> int:
 
     return x % p
 
+def reverseHexBytes(hex: str) -> str:
+    return int('0x' + hex, 16).to_bytes(len(hex) // 2, byteorder='little').hex()
+
 def parseVarint(varint: str) -> tuple[int, str]: 
 
     first_byte = varint[0:2]

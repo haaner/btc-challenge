@@ -2,8 +2,8 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from aux import parseVarint, toVarint
-from btc import doubleSha256, hash160
+from aux import reverseHexBytes, parseVarint, toVarint
+from btc import doubleSha256, hash160, Btc
 
 class Signature:
     def __init__(self, raw):
@@ -57,6 +57,7 @@ class Operation:
     PUSHBYTES_32 = '20'
     PUSHBYTES_33 = '21'
     PUSHBYTES_65 = '41'
+    PUSHBYTES_70 = '46'
     PUSHBYTES_71 = '47'
     PUSHBYTES_72 = '48'
     PUSHBYTES_73 = '49'
@@ -123,7 +124,7 @@ class ScriptSig:
             if script_sig != '':
                 raise Exception('unknown unlocking script')
                             
-        elif op_code in [ Operation.PUSHBYTES_71, Operation.PUSHBYTES_72, Operation.PUSHBYTES_73 ]:
+        elif op_code in [ Operation.PUSHBYTES_70, Operation.PUSHBYTES_71, Operation.PUSHBYTES_72, Operation.PUSHBYTES_73 ]:
 
             byte_count = int('0x' + op_code, 16);
             char_count = byte_count * 2
@@ -131,7 +132,7 @@ class ScriptSig:
             self.signature = Signature(script_sig[:char_count])
             script_sig = script_sig[char_count:]
 
-            if op_code == Operation.PUSHBYTES_71 and script_sig == '':
+            if script_sig == '':
                 self.type = ScriptType.P2PK 
                 self.pubKey = None
             else:
@@ -425,7 +426,6 @@ class PubKeySigMsg:
 class Trx:
 
     def __init__(self, id: str = None, is_test: bool = False):
-
         self.id = id
         self.isTest = is_test
         
@@ -438,13 +438,15 @@ class Trx:
             self.setRaw(result.decode('utf-8'), self.isTest)
     
     def setRaw(self, raw: str, is_test: bool = False):
-
         self.raw = raw
+
+        self.id = reverseHexBytes(doubleSha256(self.raw))
         self.isTest = is_test
 
         self._parseRaw()
 
         self._pkMsgs = None
+        self._tprs = None
         
     def _parseInputs(self, raw: str):
         offset = len(self.raw) - len(raw)
@@ -649,16 +651,17 @@ class Trx:
     
     def _getSignatureData(self) -> list: 
 
-        tprs = []
-        for i in range(self.inputCount):
-            sig_script = self.inputs[i].sigScript
-            signature = sig_script.signature
+        if self._tprs == None:
+            self._tprs = []
+            for i in range(self.inputCount):
+                sig_script = self.inputs[i].sigScript
+                signature = sig_script.signature
 
-            tprs.append(((sig_script.type, sig_script.pubKey), ((int(signature.r, 16), int(signature.s, 16)))))
+                self._tprs.append(((sig_script.type, sig_script.pubKey), ((int(signature.r, 16), int(signature.s, 16)))))
 
-        return tprs
+        return self._tprs
 
-    def getPubKeySigMsgList(self, pub_key: str = None) -> list[PubKeySigMsg]:
+    def getPubKeySigMsgList(self, pub_key_hash: str = None) -> list[PubKeySigMsg]:
         
         prsz: list[PubKeySigMsg] = []
 
@@ -673,9 +676,15 @@ class Trx:
                 p = pb
             else:
                 p = ps
-
-            if pub_key == None or pub_key == p:
+            
+            #print(pub_key_hash, pb, ps, p)
+            #if pub_key_hash != None:
+            #    print(pub_key_hash, Btc.publicKeyHexToHash160(pb, self.isTest), Btc.publicKeyHexToHash160(ps, self.isTest))
+            
+            if pub_key_hash == None or pub_key_hash == Btc.publicKeyHexToHash160(p, False, self.isTest) or pub_key_hash == Btc.publicKeyHexToHash160(p, True, self.isTest):
                 prsz.append(PubKeySigMsg(p, rs, msg))    
+            else:
+                pass
 
         return prsz
     
@@ -694,9 +703,8 @@ if __name__ == '__main__':
         raise Exception('trx is flawed')
 
     prsz_list = test_trx.getPubKeySigMsgList()
-
-    for i in range(len(prsz_list)):
-        prsz = prsz_list[i]
+    print('Signatures for trx ' + test_trx.id + ':', len(prsz_list))
+    for prsz in prsz_list:
         print('Is signature correct:', prsz.verify())
 
     test2_trx = Trx()
@@ -707,16 +715,9 @@ if __name__ == '__main__':
         raise Exception('trx is flawed')
 
     prsz_list = test2_trx.getPubKeySigMsgList()
-
-    for i in range(len(prsz_list)):
-        prsz = prsz_list[i]
+    print('Signatures for trx ' + test2_trx.id + ':', len(prsz_list))
+    for prsz in prsz_list:
         print('Is signature correct:', prsz.verify())
-    
-    '''
-    prsz_list = test_trx.getPubKeySigMsgList('02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459')
-    prsz = prsz_list[0]  
-    
-    print('Is signature correct:', prsz.verify())
 
     ###
 
@@ -728,11 +729,10 @@ if __name__ == '__main__':
     print('Signatures for trx ' + trx.id + ':', len(prsz_list))
     for prsz in prsz_list:
         print('Is signature correct:', prsz.verify())
-    
-    prev_trx = Trx('72093588e22fe32ce7e039ceae754ae7a8cb09e44b353e6050e4053dc03dc92f')
-    
-    prsz_list = prev_trx.getPubKeySigMsgList()
+ 
+    prev_trx = Trx('72093588e22fe32ce7e039ceae754ae7a8cb09e44b353e6050e4053dc03dc92f')   
 
-    for i in range(len(prsz_list)):
-        prsz = prsz_list[i]
+    prsz_list = prev_trx.getPubKeySigMsgList()
+    print('Signatures for trx ' + prev_trx.id + ':', len(prsz_list))
+    for prsz in prsz_list:
         print('Is signature correct:', prsz.verify())
