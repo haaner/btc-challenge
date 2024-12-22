@@ -18,7 +18,10 @@ class Rsz:
     def __init__(self, utxo: str):
         self.utxo = utxo
 
-        self.utxoHash = Btc.wifToHash160(utxo) # TODO  bc1 to hash      
+        if (self.utxo.startswith('bc1')):
+            self.utxoHash = Btc.bechToHash160(utxo)
+        else:
+            self.utxoHash = Btc.wifToHash160(utxo)
 
         count = 100
 

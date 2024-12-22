@@ -258,12 +258,17 @@ class Btc:
         return { 'P2PKH-C': pubkey_address_compressed, 'P2PKH-U': pubkey_address_uncompressed, 'P2SH': Btc.publicKeyPointToP2SH(pk_point, for_testnet), 'P2WPKH': Btc.publicKeyPointToP2WPKH(pk_point, for_testnet) }
 
     def wifToHash160(wif: str) -> str:
-
         address_bin = base58.b58decode(wif)
         hash_hex = codecs.encode(address_bin, 'hex')
         hash160 = codecs.decode(hash_hex[2:42])
 
         return hash160
+    
+    def bechToHash160(bech32_address: str) -> str:
+        from bech32 import decode
+        version, data = decode(bech32_address[:2], bech32_address)      
+
+        return ''.join(format(x, '02x') for x in data)
 
 ####################################################################################
 
@@ -278,10 +283,15 @@ if __name__ == '__main__':
     ]:
         print(Btc.privateKeyToPublicKeyAddresses(private_hex_key))
 
+    print()
+      
+    if Btc.bechToHash160('bc1qpdnwhl8zfjpy5jfm2zssjqrdpje83ntgl5j00c') != Btc.wifToHash160('123HjFA4jzEJY6t46A4otSTgZLUVv5vp7g'):
+        print("The wif / bech hashes mismatch!") 
+
     priv_key = Btc.generatePrivateHexKey()
     test_priv_key = 'ef' + priv_key
     main_priv_key = '80' + priv_key
-
+    
     print(Btc.privateKeyToPublicKeyAddresses(test_priv_key))
     print(Btc.privateKeyToPublicKeyAddresses(main_priv_key))
     print(Btc.privateKeyToPublicKeyAddresses(priv_key))
