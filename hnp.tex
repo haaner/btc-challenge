@@ -1,0 +1,52 @@
+\documentclass[12pt,a4paper,oneside,ngerman,draft]{article}
+
+\usepackage[ngerman]{babel}
+\usepackage[utf8]{inputenc} 
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+
+\begin{document}
+
+\hyphenpenalty=300
+\tolerance=2000
+
+\section{ECDSA und Nonces}
+Es sei $k$ eine zufällige Nonce, $g$ die Gruppenordnung von $G$, $P_G$ der Basispunkt von $G$ und $r: = x_r\mbox{, wobei }(x_r, y_r):=kP_G$. Weiter sei $z:=H(m)$ der Hash der Nachricht $m$ und $d$ der private Schlüssel, dann setzt man:
+$$s: = (z + dr)\cdot k^{-1} \mbox{ mod } g$$
+Unter anderem folgt: 
+$$d=(sk - z)\cdot r^{-1} \mbox{ mod } g$$
+\subsection{Mehrfache Verwendung derselben Nonce}
+Wird die Nonce $k$ mehrfach zur Signierung verwendet, dann erhält man für zwei Signaturpaare $(r_1,s_2)$, $(r_2,s_2)$: $$r_1=x(kP_G)=r_2$$ und damit: $$s_1-s_2=(z_1+r_1d-z_2-r_2d)\cdot k^{-1}\mbox{ mod } g$$$$\Leftrightarrow s_1-s_2=(z_1-z_2)\cdot k^{-1}\mbox{ mod } g$$
+Also:
+$$k=(z_1-z_2)(s_1-s_2)^{-1}\mbox{ mod } g$$
+\subsection{Verwendung unterschiedlicher Nonces}
+Werden unterschiedliche Nonces $k_1,k_2,\dots,k_n$ verwendet, so ergibt sich:
+$$k_i=s_i^{-1}(z+dr_i)\mbox{ mod } g$$
+Insbesondere gilt: $$k_1-k_n=s_1^{-1}(z+dr_1) - s_n^{-1}(z+dr_n)\mbox{ mod } g$$ und nach einigen Umformungen ergibt sich: $$d=(r_ns_1-r_1s_n)^{-1}(s_nz_1-s_1z_n-s_1s_n(k_1-k_n))\mbox{ mod } g$$
+
+\section{HNP - Attacke}
+Das Hidden-Number-Problem sucht für $p\in\mathbb{Z}$ und $(t_i,a_i)\in\mathbb{Z}^2$ nach $(x_1,x_2,\dots,x_n,y) \in \mathbb{Z}^{n+1}$ und $q_i \in \mathbb{Z}\ (i=1,2,\dots,n)$:
+$$x_i + t_iy + pq_i = a_i$$
+Mit $x_i: = k_i, y:=d$ und $p:=g, t_i := -s_i^{-1} r_i, a_i:=s_i^{-1}z_i $ erhält man daraus:
+$$k_i - s_i^{-1} r_id + gq_i = s_i^{-1}z_i \mbox{ mit }0\leq x_i, y < g$$
+Das Matrix-System sieht demnach folgendermaßen aus:
+$$A = \begin{pmatrix}
+1 & 0 & 0 & \dots & -s_1^{-1} r_1 & g & 0 & \dots & 0\\
+0 & 1 & 0 & \dots & -s_2^{-1} r_2 & 0 & g & \dots & 0\\ 
+\vdots & 0 & \ddots & & & 0 & 0 & \ddots\\ 
+0 & \dots & 0 & 1 & -s_n^{-1} r_n & 0 & 0 & \dots & g
+\end{pmatrix}, 
+d = \begin{pmatrix}
+s_1^{-1}z_1\\ 
+s_2^{-1}z_2\\ 
+\vdots\\ 
+s_n^{-1}z_n
+\end{pmatrix}$$
+$$A \in \mathbb{Z}^{n\times n+1 + n}, d \in \mathbb{Z}^n$$
+$$x_i, y, q_i \in \mathbb{Z} \mbox{ und } 0\leq x_i, y < g\ (i=1,2,\dots,n)$$
+
+\end{document}

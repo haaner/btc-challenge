@@ -1,4 +1,13 @@
-from lib.btc import Btc 
+#!/usr/bin/env python
 
-pubkey_hex = '02EE04998F8DBD9819D0391A5AA38DB1331B0274F64ABC3BC66D69EE61DB913459'
-pubkey_point = Btc.publicKeyHexToPoint(pubkey_hex);
+if __package__:
+    from os import sys, path
+    sys.path.append(path.dirname(path.abspath(__file__)))
+
+from sys import stdin
+from lib.secp256k1 import randrange, secp
+
+d = 2 # secret key
+dG = secp.mult(d, secp.g) # public key
+
+print(d, dG)

@@ -1,9 +1,11 @@
+#!/usr/bin/env python
+
 if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from trx import PubKeySigMsg, Trx 
-from btc import Btc
+from lib.trx import PubKeySigMsg, Trx 
+from lib.btc import Btc
 
 import urllib.request
 import json      
@@ -61,6 +63,7 @@ class Rsz:
     def tuples(self) -> list[PubKeySigMsg]:
         pk_count = 0;
         tp_count = 0;
+
         prsz_list = []
         for trx in self.otrxs:
             current_list = trx.getPubKeySigMsgList(self.utxoHash)
@@ -94,10 +97,10 @@ if __name__ == '__main__':
     else:
         wif = '18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8'
 
-    rsz = Rsz(wif)
-    if rsz.verifyTuples():
-        for tuple in rsz.tuples():
+    prsz = Rsz(wif)
+    if prsz.verifyTuples():
+        for tuple in prsz.tuples():
             print(tuple.rs[0], tuple.rs[1], tuple.z)
     else:
-        raise Exception('RSZ error') 
+        raise Exception('Prsz error') 
    
