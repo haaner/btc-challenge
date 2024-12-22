@@ -279,7 +279,11 @@ if __name__ == '__main__':
         'ef26F85CE8B2C635AD92F6148E4443FE415F512F3F29F44AB0E2CBDA819295BBD5',
         'efD9172189D7700FDFB4B6A5C4A83990EAEAFE455441B7D43FF85678EB93AC2713',
         'L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC',
-        '5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm'
+        'L3515Af6HhtTBfSoQPeV9uQEBgnUdsR3x8fcEuQXiQmiYZz5SnhD',
+        'L1Sk5hZMw2XU5axBRrtQSR3A7zdJtSjRP33x8crmEJAPpL196rtf',
+        '5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm',
+        '5JEcrcmtJd3D187VdDaxpqmMTGBWH1HtWmiN7KTuqcf4KZrBwy4',
+        '5JZm8bScnYZrD1rV5uZHG4hvPcnpW43R9z9vBBmPxe8b5PDb4rC'
     ]:
         print(Btc.privateKeyToPublicKeyAddresses(private_hex_key))
 
