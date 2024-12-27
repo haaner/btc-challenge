@@ -116,7 +116,6 @@ class EllipticCurve:
             else:
                 k = k2
 
-            k = randrange(1, self.n)
             P = self.mult(k, self.g)
 
             r = P.x % self.n
