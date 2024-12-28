@@ -24,6 +24,7 @@ print("[]\n[\n]\n") # target section
 # equation section
 print('[')
 
+modulo = []
 d = []
 i = 0
 
@@ -33,17 +34,17 @@ for rsz in rsz_tuples:
 
     s_inv = inv(s)
 
-    for j in range(2*n + 1):
+    for j in range(n + 1):
         if i == j:
             print(1, end = ' ')
         elif j == n:
             print((-s_inv * r) % g, end = ' ')
-        elif j == n+1 + i:            
-            print(g, end = ' ')
         else:
             print(0, end = ' ')
     
+    modulo.append(g)
     d.append((s_inv * z) % g)
+
     print(']')
     i += 1
 
@@ -68,4 +69,5 @@ print(']')
 
 upper = [ g-1 for j in range(0, n+1) ]
 
-print('[', *upper, sep=' ', end=' ]')
+print('[', *upper, sep=' ', end=" ]\n")
+print('[', *modulo, sep=' ', end=' ]')
