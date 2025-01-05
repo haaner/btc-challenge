@@ -10,9 +10,21 @@ from lib.secp256k1 import secp
 d = 5 # secret key
 dG = secp.mult(d, secp.g) # public key
 
-print(d, dG)
+priv_pubkey = [ d, dG ]
+print(f'{priv_pubkey = }')
 
+opt_sol = []
 for k in range(1, 5):
     z = k + 100
-    r,s  = secp.sign(z, d, k)
-    print(r, s, z)
+    (r, s), corrected  = secp.sign(z, d, k)
+
+    if corrected:
+        opt_sol.append(secp.n - k)
+    else:
+        opt_sol.append(k)
+
+    print(r, s, z, corrected)
+
+opt_sol.append(d)
+
+print(f'{opt_sol = }')

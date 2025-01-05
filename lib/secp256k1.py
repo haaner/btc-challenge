@@ -107,7 +107,7 @@ class EllipticCurve:
 
         return result
 
-    def sign(self, z: int, private_key: int, k2: int = None) -> list[int]:
+    def sign(self, z: int, private_key: int, k2: int = None) -> list[list[int], bool]:
 
         while True:
 
@@ -124,10 +124,11 @@ class EllipticCurve:
             if (r and s) or k2 != None:
                 break
 
-        if s > self.n/2:
+        corrected = s > self.n/2
+        if corrected:
             s = self.n - s
 
-        return (r, s)
+        return ((r, s), corrected)
     
     def verifySignature(self, public_key: Point, z: int, r_s: tuple[int, int]) -> bool:
 
@@ -183,7 +184,7 @@ if __name__ == '__main__':
     private_key = 0x514321CFA3C255BE2CE8249A70267B9D2935B7DC5B36055BA158D5F00C645F83
     k = 0x75bcd15 # nonce
 
-    rs = secp.sign(z, private_key, k)
+    rs, corrected = secp.sign(z, private_key, k)
     public_key = secp.mult(private_key, secp.g)
 
     print('Is signature correct:', secp.verifySignature(public_key, z, rs))
