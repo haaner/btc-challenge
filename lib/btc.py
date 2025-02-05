@@ -177,6 +177,10 @@ class Btc:
     def publicKeyHexToHash160(pubkey_hex: str, compress = True, for_testnet: bool = False) -> str:
         return Btc.wifToHash160(Btc.publicKeyHexToWif(pubkey_hex, compress, for_testnet))
 
+    def privateIntKeyToPublicKeyAddresses(d: int):
+        h = d.to_bytes(32, byteorder='big').hex()
+        return Btc.privateKeyToPublicKeyAddresses(Btc.privateHexKeyToWif(h))
+    
     def privateHexKeyToWif(privkey_hex: str, compress: bool = True, for_testnet: bool = False) -> str:
         variant = Btc._getPrivateKeyPrefix(for_testnet)
         

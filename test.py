@@ -4,27 +4,40 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
-from sys import stdin
-from lib.secp256k1 import secp
+def generate_test_rsz():
 
-d = 5 # secret key
-dG = secp.mult(d, secp.g) # public key
+    from sys import stdin
+    from lib.secp256k1 import secp
 
-priv_pubkey = [ d, dG ]
-print(f'{priv_pubkey = }')
+    d = 5 # secret key
+    dG = secp.mult(d, secp.g) # public key
 
-opt_sol = []
-for k in range(1, 5):
-    z = k + 100
-    (r, s), corrected  = secp.sign(z, d, k)
+    priv_pubkey = [ d, dG ]
+    print(f'{priv_pubkey = }')
 
-    if corrected:
-        opt_sol.append(secp.n - k)
-    else:
-        opt_sol.append(k)
+    opt_sol = []
+    for k in range(1, 5):
+        z = k + 100
+        (r, s), corrected  = secp.sign(z, d, k)
 
-    print(r, s, z, corrected)
+        if corrected:
+            opt_sol.append(secp.n - k)
+        else:
+            opt_sol.append(k)
 
-opt_sol.append(d)
+        print(r, s, z, corrected)
 
-print(f'{opt_sol = }')
+    opt_sol.append(d)
+
+    print(f'{opt_sol = }')
+    
+if __name__ == '__main__':
+    from sys import stdin
+    from lib.btc import Btc
+    from lib.secp256k1 import secp
+
+    d = 5 # secret key
+    dG = secp.mult(d, secp.g) # public key
+
+    print(Btc.publicKeyPointToWif(dG))
+    print(Btc.privateIntKeyToPublicKeyAddresses(d))
