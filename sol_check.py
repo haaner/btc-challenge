@@ -6,7 +6,7 @@ if __package__:
 
 if __name__ == '__main__':
     
-    from sys import argv, stdin
+    from sys import argv, stdin, stderr
     from lib.btc import Btc
     
     import re 
@@ -28,7 +28,7 @@ if __name__ == '__main__':
             rd = [ int(x) for x in l.split() ] 
             d = rd[-1]
 
-            #print(d)
+            print(d, file=stderr)
 
             if d == 0:
                 continue
