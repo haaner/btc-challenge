@@ -42,7 +42,7 @@ def parse_args(g):
         nonce_diff_max = None
     else:
         nonce_diff_max = g - 1
-        for i in range(nbe):
+        for i in range(1, nbe+1):
             nonce_diff_max -= pow(2, 255-i)
         if nonce_diff_max < 0:
             nonce_diff_max = 0
