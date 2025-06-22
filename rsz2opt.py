@@ -12,6 +12,7 @@ def inv(s):
     return inverseMod(s, g)
 
 g = secp.n
+p = secp.p
 
 def check_value(value):
     if (ival := int(value)) > 255:  
@@ -23,7 +24,7 @@ def check_value(value):
 
     return ival
 
-def parse_args(g):
+def parse_args(p):
     parser = argparse.ArgumentParser() 
 
     parser.add_argument('--nonce-bits-max', type=check_value) 
@@ -33,16 +34,16 @@ def parse_args(g):
 
     nbm = args.nonce_bits_max
     if nbm == None:
-        nonce_max = g - 1
+        nonce_max = p - 1
     else:
         nonce_max = pow(2, nbm) - 1
 
     nbe = args.nonce_bits_equal
-    if nbe == None:
+    if nbe == None or nbe == 0:
         nonce_diff_max = None
     else:
-        nonce_diff_max = g - 1
-        for i in range(1, nbe+1):
+        nonce_diff_max = pow(2, 256) - 1
+        for i in range(nbe):
             nonce_diff_max -= pow(2, 255-i)
         if nonce_diff_max < 0:
             nonce_diff_max = 0
@@ -55,7 +56,7 @@ for line in stdin:
     (r, s, z) = [ int(x) for x in line.split() ] 
     rsz_tuples.append([ r, s, z ])
 
-(nonce_max, nonce_diff_max) = parse_args(g)
+(nonce_max, nonce_diff_max) = parse_args(p)
 
 n = len(rsz_tuples)
 
