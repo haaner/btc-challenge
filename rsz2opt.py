@@ -93,6 +93,7 @@ print("]\n[ ", end = '')
 for v in d:
     print(v, end = ' ') 
 print(']') 
+print('[', *modulo, sep=' ', end=" ]\n") # solution: modulo section
 
 print()
 
@@ -140,4 +141,3 @@ upper = [ nonce_max for j in range(0, n) ] # the max values for the nonces
 upper.append(g-1) # the max value for the private key
 
 print('[', *upper, sep=' ', end=" ]\n")
-print('[', *modulo, sep=' ', end=' ]') # solution: modulo section
