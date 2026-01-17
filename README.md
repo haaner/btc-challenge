@@ -1,6 +1,6 @@
 ### Activate Python
 ```
-source .venv/activate
+source .venv/bin/activate
 ```
 
 ### Install the required Python libraries
