@@ -1,0 +1,8 @@
+*.key
+*.msg
+*.sig
+*.tmp
+*.pdf
+data/
+.venv/
+__pycache__
