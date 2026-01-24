@@ -54,6 +54,6 @@ This code can only deal with transactions using the original [ECDSA](https://lea
 
 This project and its implementation was heavily inspired by the following articles and website(s):
 
-https://medium.com/@ottosch/manually-creating-and-signing-a-bitcoin-transaction-87fbbfe46032
-https://medium.com/coinmonks/creating-and-signing-a-segwit-transaction-from-scratch-ec98577b526a
+https://medium.com/@ottosch/manually-creating-and-signing-a-bitcoin-transaction-87fbbfe46032  
+https://medium.com/coinmonks/creating-and-signing-a-segwit-transaction-from-scratch-ec98577b526a  
 https://learnmeabitcoin.com/
