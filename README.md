@@ -1,3 +1,12 @@
+
+# Summary
+
+The code within this project allows to fiddle with Bitcoin addresses, public/private key pairs, transactions and handle some elliptic curve stuff.
+
+It has been created in order to recover private keys from Bitcoin addresses with outgoing transactions.
+
+# Usage
+
 ### Activate Python
 ```
 source .venv/bin/activate
@@ -36,3 +45,15 @@ In case 0ptX finds solutions you first have to decrypt the generated csol-file i
 ```
 ./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.sol
 ```
+
+# Shortcomings
+
+This code can only deal with transactions using the original [ECDSA](https://learnmeabitcoin.com/technical/cryptography/elliptic-curve/ecdsa/) signature scheme. [Schnoor signatures](https://learnmeabitcoin.com/technical/cryptography/elliptic-curve/schnorr/), which have been introduced with the Taproot upgrade are not covered yet.
+
+# Acknowledgements
+
+This project and its implementation was heavily inspired by the following articles and website(s):
+
+https://medium.com/@ottosch/manually-creating-and-signing-a-bitcoin-transaction-87fbbfe46032
+https://medium.com/coinmonks/creating-and-signing-a-segwit-transaction-from-scratch-ec98577b526a
+https://learnmeabitcoin.com/
