@@ -9,6 +9,7 @@ It has been created in order to recover private keys from Bitcoin addresses with
 
 ### Activate Python
 ```
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
