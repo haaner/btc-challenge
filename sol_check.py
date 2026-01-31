@@ -39,3 +39,5 @@ if __name__ == '__main__':
                 if val == utxo:
                     print(f'The private key {d = } matches the public key {val} ({key})')
                     exit(0)
+
+    print('No private key was found.', end='')
