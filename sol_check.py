@@ -28,7 +28,7 @@ if __name__ == '__main__':
             rd = [ int(x) for x in l.split() ] 
             d = rd[-1]
 
-            print(d, file=stderr)
+            #print(d, file=stderr)
 
             if d == 0:
                 continue
