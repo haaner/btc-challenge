@@ -19,8 +19,8 @@ def check_value(value):
         raise argparse.ArgumentTypeError(f'Der Wert {value} muss kleiner 256 sein.')
     if ival < 1:
         raise argparse.ArgumentTypeError(f'Der Wert {value} muss größer 0 sein.')
-    if pow(2, ival) > g:
-        raise argparse.ArgumentTypeError(f'Der Wert 2^{value} muss kleiner oder gleich {g} sein.')
+    if pow(2, ival) >= g:
+        raise argparse.ArgumentTypeError(f'Der Wert 2^{value} muss kleiner {g} sein.')
 
     return ival
 
