@@ -24,7 +24,7 @@ def check_value(value):
 
     return ival
 
-def parse_args(p):
+def parse_args():
     parser = argparse.ArgumentParser() 
 
     parser.add_argument('--nonce-bits-max', type=check_value) 
@@ -34,7 +34,7 @@ def parse_args(p):
 
     nbm = args.nonce_bits_max
     if nbm == None:
-        nonce_max = p - 1
+        nonce_max = g - 1
     else:
         nonce_max = pow(2, nbm) - 1
 
@@ -56,7 +56,7 @@ for line in stdin:
     (r, s, z) = [ int(x) for x in line.split() ] 
     rsz_tuples.append([ r, s, z ])
 
-(nonce_max, nonce_diff_max) = parse_args(p)
+(nonce_max, nonce_diff_max) = parse_args()
 
 n = len(rsz_tuples)
 
@@ -133,7 +133,7 @@ print(']')
 # solution: lower bound section
 print('[ ', end = '')
 for j in range(n + 1):
-    print(0, end = ' ')
+    print(1, end = ' ')
 print(']')    
 
 # solution: upper bound section
