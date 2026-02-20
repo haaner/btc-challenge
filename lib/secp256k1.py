@@ -141,10 +141,11 @@ class EllipticCurve:
         P = self.add(self.mult(u1, self.g), self.mult(u2, public_key))
 
         return (r % self.n) == (P.x % self.n)
-        
+               
 class Secp256k1(EllipticCurve):
     def __init__(self):
-        super().__init__(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f, 0, 7, 
+        super().__init__(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f, # == 2**256 - 2**32 - 2**9 - 2**8 - 2**7 - 2**6 - 2**4 - 1
+                         0, 7, 
                          Point(0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
                          0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
       
