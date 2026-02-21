@@ -7,7 +7,8 @@ if __package__:
 import argparse
 from sys import argv, stdin
 from lib.secp256k1 import inverseMod, secp
-from os.path import basename
+from os.path import basename, dirname
+import re 
 
 def check_nb_value(value):
     if (ival := int(value)) > 255:  
@@ -19,7 +20,8 @@ def check_nb_value(value):
 
 def check_nbm_value(value):
     ival = check_nb_value(value)
-    # if ival > 252 print a warning that biases using (256 - ival) bits will probably not work
+    if ival > 252:
+        print(f'Using {NBM} values > 252 will probably not work!')
     return ival
 
 def check_skip_value(value):
@@ -37,15 +39,15 @@ def parse_args():
         description='Generate opt-data from rsz-data',
         epilog='0ptX may solve your problem(s) - www.0ptX.de', exit_on_error=True) 
 
+    parser.add_argument('rszfile') 
     parser.add_argument('--' + NBM, type=check_nbm_value) 
     parser.add_argument('--nonce-bits-equal', type=check_nb_value) 
-    parser.add_argument('--' + SKIP, type=check_skip_value) 
+    parser.add_argument('--' + SKIP, default=0, type=check_skip_value) 
 
     args = parser.parse_args()
 
     nbe = args.nonce_bits_equal
     nbm = args.nonce_bits_max
-    rsz_skip = args.skip
 
     if nbe == None:
         nonce_diff_max = None 
@@ -63,10 +65,7 @@ def parse_args():
     else:
         nonce_max = pow(2, nbm) - 1
 
-    if rsz_skip == None:
-        rsz_skip = 0
-
-    return (nbm, nonce_max, nonce_diff_max, rsz_skip)
+    return (args.rszfile, nbm, nonce_max, nbe, nonce_diff_max, args.skip)
 
 nbm_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     128: 2,
@@ -103,7 +102,18 @@ nbm_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     255: 300 
 }
 
-(nonce_bits_max, nonce_max, nonce_diff_max, rsz_skip) = parse_args()
+(rsz_file, nonce_bits_max, nonce_max, nonce_bits_equal, nonce_diff_max, rsz_skip) = parse_args()
+
+rsz_tuples = []
+
+for line in open(rsz_file):
+    (r, s, z) = [ int(x) for x in line.split() ] 
+
+    if rsz_skip > 0:
+        rsz_skip -= 1
+        continue
+
+    rsz_tuples.append([ r, s, z ])
 
 def get_needed_rsz_count():
     for nbm, n in nbm_n.items():
@@ -115,17 +125,6 @@ def get_needed_rsz_count():
 def inv(s):
     return inverseMod(s, g)
 
-rsz_tuples = []
-
-for line in stdin:
-    (r, s, z) = [ int(x) for x in line.split() ] 
-
-    if rsz_skip > 0:
-        rsz_skip -= 1
-        continue
-
-    rsz_tuples.append([ r, s, z ])
-
 rsz_n = len(rsz_tuples)
 rsz_needed = get_needed_rsz_count()
 
@@ -134,52 +133,70 @@ if rsz_needed > rsz_n:
 
 rsz_n = rsz_needed
 
-print("[]\n[\n]\n") # target section
+filename = re.sub(r'\..*', '', basename(rsz_file))
+
+if nonce_bits_max != None:
+    filename += '.nbm' + str(nonce_bits_max)
+if nonce_bits_equal != None:
+    filename += '.nbe' + str(nonce_bits_equal)
+if rsz_skip:
+    filename += '.skip' + str(rsz_skip)
+
+directory = dirname(rsz_file)
+
+if directory != '':
+    directory += '/'
+
+filename = directory + filename + '.opt'  
+
+f = open(filename, 'w')
+
+print("[]\n[\n]\n", file=f) # target section
 
 # equation section
-print('[')
+print('[', file=f)
 
 modulo = []
 d = []
 i = 0
 
 for rsz in rsz_tuples:
-    print('[', end = ' ')
+    print('[', end = ' ', file=f)
     (r, s, z) = rsz
 
     s_inv = inv(s)
 
     for j in range(rsz_n + 1):
         if i == j:
-            print(1, end = ' ')
+            print(1, end = ' ', file=f)
         elif j == rsz_n:
-            print((-s_inv * r) % g, end = ' ')
+            print((-s_inv * r) % g, end = ' ', file=f)
         else:
-            print(0, end = ' ')
+            print(0, end = ' ', file=f)
     
     modulo.append(g)
     d.append((s_inv * z) % g)
 
-    print(']')
+    print(']', file=f)
     i += 1
 
     if i == rsz_n:
         break
 
-print("]\n[ ", end = '')
+print("]\n[ ", end = '', file=f)
 for v in d:
-    print(v, end = ' ') 
-print(']') 
-print('[', *modulo, sep=' ', end=" ]\n") # solution: modulo section
+    print(v, end = ' ', file=f) 
+print(']', file=f) 
+print('[', *modulo, sep=' ', end=" ]\n", file=f) # solution: modulo section
 
-print()
+print(file=f)
 
 # inequation section
 if nonce_diff_max == None:
-    print("[\n]\n[]\n[]\n") 
+    print("[\n]\n[]\n[]\n", file=f) 
 else:
     rows = 0
-    print('[')
+    print('[', file=f)
     for i in range(rsz_n):
         for j in range(i+1, rsz_n):
             row = []
@@ -191,30 +208,34 @@ else:
             row.append(-1)
             row = row + [ 0 for k in range(j + 1, rsz_n+1) ]           
 
-            print('[', *row, sep=' ', end=" ]\n")
+            print('[', *row, sep=' ', end=" ]\n", file=f)
             rows += 1
-    print(']')
+    print(']', file=f)
 
     lower = [ -nonce_diff_max for j in range(0, rows) ]
     upper = [ nonce_diff_max for j in range(0, rows) ]
     
-    print('[', *lower, sep=' ', end=" ]\n")
-    print('[', *upper, sep=' ', end=" ]\n\n")
+    print('[', *lower, sep=' ', end=" ]\n", file=f)
+    print('[', *upper, sep=' ', end=" ]\n\n", file=f)
         
 # solution: digit section
-print('[ ', end = '')
+print('[ ', end = '', file=f)
 for j in range(rsz_n + 1):
-    print(0, end = ' ')
-print(']')    
+    print(0, end = ' ', file=f)
+print(']', file=f)    
 
 # solution: lower bound section
-print('[ ', end = '')
+print('[ ', end = '', file=f)
 for j in range(rsz_n + 1):
-    print(1, end = ' ')
-print(']')    
+    print(1, end = ' ', file=f)
+print(']', file=f)    
 
 # solution: upper bound section
 upper = [ nonce_max for j in range(0, rsz_n) ] # the max values for the nonces
 upper.append(g-1) # the max value for the private key
 
-print('[', *upper, sep=' ', end=" ]\n")
+print('[', *upper, sep=' ', end=" ]\n", file=f)
+
+f.close()
+
+print (f'{filename} has been written.')
