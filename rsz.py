@@ -4,11 +4,13 @@ if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
 
+from urllib.error import URLError
 from lib.trx import PubKeySigMsg, Trx 
 from lib.btc import Btc
 
 import urllib.request
 import json      
+import time;
 
 class Rsz:
 
@@ -53,11 +55,15 @@ class Rsz:
                 for ii in range(n_inputs):
                     addr = inputs[ii]['prev_out']['addr']
                     if addr == self.utxo:
-                        self.otrxs.append(Trx(txn['hash']))
-                        break  
+                        try:
+                            self.otrxs.append(Trx(txn['hash']))
+                            break  
+                        except URLError as e:
+                            pass    
             
             offset += count
             obj = self._fetchTrxObject(offset)
+            time.sleep(20);
             current_n = len(obj['txs'])
     
     def tuples(self) -> list[PubKeySigMsg]:
