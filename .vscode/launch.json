@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": "< data/secp.rsz"
+            "args": "--nonce-zero-msb=128 data/secp.rsz"
         }
     ]
 }
