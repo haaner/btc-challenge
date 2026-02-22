@@ -45,8 +45,8 @@ def parse_args():
 
     parser.add_argument('rszfile') 
     parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
-    parser.add_argument('--' + NSMSB, type=check_msb_value,  help='The number of consecutive most significant bits that all nonces share.') 
-    parser.add_argument('--' + SKIP, default=0, type=check_skip_value) 
+    parser.add_argument('--' + NSMSB, type=check_msb_value, help='The number of consecutive most significant bits that all nonces share.') 
+    parser.add_argument('--' + SKIP, default=0, type=check_skip_value, help='The number of initial rsz entries in the file that should be skipped.') 
 
     args = parser.parse_args()
 
