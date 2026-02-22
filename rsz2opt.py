@@ -133,9 +133,9 @@ rsz_n = len(rsz_tuples)
 rsz_needed = get_needed_rsz_count()
 
 if rsz_needed > rsz_n:
-    raise Exception(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You have to choose lower values for "{NZMSB}" or "{SKIP}"')
-
-rsz_n = rsz_needed
+    print(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You should choose lower values for "{NZMSB}" or "{SKIP}"')
+else:
+    rsz_n = rsz_needed
 
 filename = re.sub(r'\..*', '', basename(rsz_file))
 
