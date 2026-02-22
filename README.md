@@ -37,14 +37,14 @@ https://www.0ptx.de/download
 
 ### Run 0ptX against the opt-data
 ```
-./0ptX 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm252.opt
+./0ptX 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm3.opt
 ```
 
 In case 0ptX finds solutions you first have to decrypt the generated csol-file in order to get a sol file, which is needed for the final step - see here for details on decryption: https://www.0ptx.de/lizenz
 
 ### Check the private keys in a (0ptX-generated) sol file against an utxo
 ```
-./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm252.sol
+./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm3.sol
 ```
 
 # Shortcomings
