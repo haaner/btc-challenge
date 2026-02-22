@@ -10,7 +10,11 @@ from lib.secp256k1 import inverseMod, secp
 from os.path import basename, dirname
 import re 
 
-def check_nb_value(value):
+NZMSB='nonce-zero-msb'
+NSMSB='nonce-share-msb'
+SKIP='skip'
+
+def check_msb_value(value):
     if (ival := int(value)) > 255:  
         raise argparse.ArgumentTypeError(f'The value {value} must be smaller than 256.')
     if ival < 1:
@@ -18,21 +22,21 @@ def check_nb_value(value):
 
     return ival
 
-def check_nbm_value(value):
-    ival = check_nb_value(value)
-    if ival > 252:
-        print(f'Using {NBM} values > 252 will probably not work!')
+def check_nzmsb_value(value):
+    if (ival := check_msb_value(value)) > 252:
+        print(f'Using {NZMSB} values > 252 will probably not work!')
+
     return ival
 
 def check_skip_value(value):
     if (ival := int(value)) < 0:
         raise argparse.ArgumentTypeError(f'The value {value} must be >= 0.')
 
+def get_arg(args: list, key: str):
+    return getattr(args, key.replace('-', '_'))  
+
 g = secp.n
 p = secp.p
-
-NBM='nonce-bits-max'
-SKIP='skip'
 
 def parse_args():
     parser = argparse.ArgumentParser(prog=basename(__file__),
@@ -40,34 +44,34 @@ def parse_args():
         epilog='0ptX may solve your problem(s) - www.0ptX.de', exit_on_error=True) 
 
     parser.add_argument('rszfile') 
-    parser.add_argument('--' + NBM, type=check_nbm_value) 
-    parser.add_argument('--nonce-bits-equal', type=check_nb_value) 
+    parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
+    parser.add_argument('--' + NSMSB, type=check_msb_value,  help='The number of consecutive most significant bits that all nonces share.') 
     parser.add_argument('--' + SKIP, default=0, type=check_skip_value) 
 
     args = parser.parse_args()
 
-    nbe = args.nonce_bits_equal
-    nbm = args.nonce_bits_max
+    nshare_msb = get_arg(args, NSMSB) # args.nonce_share_msb 
+    nzero_msb = get_arg(args, NZMSB) # args.nonce_zero_msb
 
-    if nbe == None:
+    if nshare_msb == None:
         nonce_diff_max = None 
-        if nbm == None:
-            nbm = 252     
+        if nzero_msb == None:
+            nzero_msb = 252     
     else:   
         nonce_diff_max = pow(2, 256) - 1
-        for i in range(nbe):
+        for i in range(nshare_msb):
             nonce_diff_max -= pow(2, 255-i)
         if nonce_diff_max < 0:
             nonce_diff_max = 0
 
-    if nbm == None:
+    if nzero_msb == None:
         nonce_max = g - 1
     else:
-        nonce_max = pow(2, nbm) - 1
+        nonce_max = pow(2, nzero_msb) - 1
 
-    return (args.rszfile, nbm, nonce_max, nbe, nonce_diff_max, args.skip)
+    return (args.rszfile, nzero_msb, nonce_max, nshare_msb, nonce_diff_max, args.skip)
 
-nbm_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
+msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     128: 2,
     170: 3,
     190: 4,
@@ -102,7 +106,7 @@ nbm_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     255: 300 
 }
 
-(rsz_file, nonce_bits_max, nonce_max, nonce_bits_equal, nonce_diff_max, rsz_skip) = parse_args()
+(rsz_file, nonce_zero_msb, nonce_max, nonce_share_msb, nonce_diff_max, rsz_skip) = parse_args()
 
 rsz_tuples = []
 
@@ -116,11 +120,11 @@ for line in open(rsz_file):
     rsz_tuples.append([ r, s, z ])
 
 def get_needed_rsz_count():
-    for nbm, n in nbm_n.items():
-        if nonce_bits_max <= nbm:
+    for msb, n in msb_n.items():
+        if nonce_zero_msb <= msb:
             return n
         
-    raise Exception(f'Something is flawed: {nonce_bits_max} > {nbm}')
+    raise Exception(f'Something is flawed: {nonce_zero_msb} > {msb}')
 
 def inv(s):
     return inverseMod(s, g)
@@ -129,16 +133,16 @@ rsz_n = len(rsz_tuples)
 rsz_needed = get_needed_rsz_count()
 
 if rsz_needed > rsz_n:
-    raise Exception(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You have to choose lower values for "{NBM}" or "{SKIP}"')
+    raise Exception(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You have to choose lower values for "{NZMSB}" or "{SKIP}"')
 
 rsz_n = rsz_needed
 
 filename = re.sub(r'\..*', '', basename(rsz_file))
 
-if nonce_bits_max != None:
-    filename += '.nbm' + str(nonce_bits_max)
-if nonce_bits_equal != None:
-    filename += '.nbe' + str(nonce_bits_equal)
+if nonce_zero_msb != None:
+    filename += '.nzm' + str(nonce_zero_msb)
+if nonce_share_msb != None:
+    filename += '.nsm' + str(nonce_share_msb)
 if rsz_skip:
     filename += '.skip' + str(rsz_skip)
 
