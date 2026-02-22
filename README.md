@@ -25,8 +25,8 @@ pip install -r requirements.txt
 
 ### Create opt-data from a rsz
 ```
-./rsz2opt.py < 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz > 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.opt
-./rsz2opt.py --nonce-bits-equal=64 --nonce-bits-max=128 < 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz > 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8_nbe64_nbm128.opt
+./rsz2opt.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
+./rsz2opt.py --nonce-share-msb=64 --nonce-zero-msb=128 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
 ```
 
 ### Download a copy of 0ptX
@@ -37,14 +37,14 @@ https://www.0ptx.de/download
 
 ### Run 0ptX against the opt-data
 ```
-./0ptX 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.opt
+./0ptX 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm252.opt
 ```
 
 In case 0ptX finds solutions you first have to decrypt the generated csol-file in order to get a sol file, which is needed for the final step - see here for details on decryption: https://www.0ptx.de/lizenz
 
 ### Check the private keys in a (0ptX-generated) sol file against an utxo
 ```
-./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.sol
+./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm252.sol
 ```
 
 # Shortcomings
