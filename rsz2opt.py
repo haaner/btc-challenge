@@ -5,32 +5,32 @@ if __package__:
     sys.path.append(path.dirname(path.abspath(__file__)))
 
 import argparse
-from sys import argv, stdin
+from sys import argv, stdin, exit
 from lib.secp256k1 import inverseMod, secp
 from os.path import basename, dirname
 import re 
 
 NZMSB='nonce-zero-msb'
-NSMSB='nonce-share-msb'
+NEMSB='nonce-equal-msb'
 SKIP='skip'
 
 def check_msb_value(value):
     if (ival := int(value)) > 255:  
-        raise argparse.ArgumentTypeError(f'The value {value} must be smaller than 256.')
+        exit(f'The value {value} must be smaller than 256.')
     if ival < 1:
-        raise argparse.ArgumentTypeError(f'The value {value} must be greater than 0.')
+        exit(f'The value {value} must be greater than 0.')
 
     return ival
 
 def check_nzmsb_value(value):
-    if (ival := check_msb_value(value)) > 252:
-        print(f'Using {NZMSB} values > 252 will probably not work!')
+    if (ival := check_msb_value(value)) < 3:
+        print(f'Using {NZMSB} values < 3 will probably not work!')
 
     return ival
 
 def check_skip_value(value):
     if (ival := int(value)) < 0:
-        raise argparse.ArgumentTypeError(f'The value {value} must be >= 0.')
+        exit(f'The value {value} must be >= 0.')
 
 def get_arg(args: list, key: str):
     return getattr(args, key.replace('-', '_'))  
@@ -43,23 +43,26 @@ def parse_args():
         description='Generate opt-data from rsz-data',
         epilog='0ptX may solve your problem(s) - www.0ptX.de', exit_on_error=True) 
 
-    parser.add_argument('rszfile') 
+    parser.add_argument('rsz_file') 
     parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
-    parser.add_argument('--' + NSMSB, type=check_msb_value, help='The number of consecutive most significant bits that all nonces share.') 
+    parser.add_argument('--' + NEMSB, type=check_msb_value, help='The number of consecutive most significant bits that are equal among all nonces.') 
     parser.add_argument('--' + SKIP, default=0, type=check_skip_value, help='The number of initial rsz entries in the file that should be skipped.') 
 
     args = parser.parse_args()
 
-    nshare_msb = get_arg(args, NSMSB) # args.nonce_share_msb 
+    nequal_msb = get_arg(args, NEMSB) # args.nonce_equal_msb 
     nzero_msb = get_arg(args, NZMSB) # args.nonce_zero_msb
 
-    if nshare_msb == None:
-        nonce_diff_max = None 
+    if nequal_msb == None:
         if nzero_msb == None:
-            nzero_msb = 252     
+             exit(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space! 3 bits seems to be a good choice assuming your rsz-file contains enough rsz-tuples.')
+
+        nonce_diff_max = None 
     else:   
+        nequal_msb_complement = 256 - nequal_msb 
+
         nonce_diff_max = pow(2, 256) - 1
-        for i in range(nshare_msb):
+        for i in range(nequal_msb_complement):
             nonce_diff_max -= pow(2, 255-i)
         if nonce_diff_max < 0:
             nonce_diff_max = 0
@@ -67,46 +70,46 @@ def parse_args():
     if nzero_msb == None:
         nonce_max = g - 1
     else:
-        nonce_max = pow(2, nzero_msb) - 1
+        nonce_max = pow(2, 256 - nzero_msb) - 1
 
-    return (args.rszfile, nzero_msb, nonce_max, nshare_msb, nonce_diff_max, args.skip)
+    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, args.skip)
 
 msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
-    128: 2,
-    170: 3,
-    190: 4,
-    200: 5,
-    208: 6,
-    212: 7,
-    220: 8,
-    224: 9,
-    227: 10,
-    228: 11,
-    230: 12,
-    232: 13,
-    234: 14,
-    236: 15,
-    238: 16,
-    239: 17,
-    240: 18,
-    241: 19,
-    242: 20,
-    243: 22,
-    244: 24,
-    245: 28,
-    246: 31,
-    247: 35,
-    248: 40,
-    249: 50,
-    250: 70,
-    251: 100,
-    252: 150,
-    253: 200,
-    254: 250,
-    255: 300 
+    1: 300,
+    2: 250,
+    3: 200,
+    4: 150,
+    5: 100,
+    6: 70,
+    7: 50,
+    8: 40,
+    9: 35,
+    10: 31,
+    11: 28,
+    12: 24,
+    13: 22,
+    14: 20,
+    15: 19,
+    16: 18,
+    17: 17,
+    18: 16,
+    20: 15,
+    22: 14,
+    24: 13,
+    26: 12,
+    28: 11,
+    29: 10,
+    32: 9,
+    36: 8,
+    44: 7,
+    48: 6,
+    56: 5,
+    66: 4,
+    86: 3,
+    128: 2
 }
 
-(rsz_file, nonce_zero_msb, nonce_max, nonce_share_msb, nonce_diff_max, rsz_skip) = parse_args()
+(rsz_file, nonce_zero_msb, nonce_max, nonce_equal_msb, nonce_diff_max, rsz_skip) = parse_args()
 
 rsz_tuples = []
 
@@ -120,11 +123,17 @@ for line in open(rsz_file):
     rsz_tuples.append([ r, s, z ])
 
 def get_needed_rsz_count():
+
+    nzm = 256 if nonce_zero_msb is None else nonce_zero_msb
+    nem = 256 if nonce_equal_msb is None else nonce_equal_msb
+    
+    nonce_msb = nzm if nzm < nem else nem
+
     for msb, n in msb_n.items():
-        if nonce_zero_msb <= msb:
+        if nonce_msb <= msb:
             return n
         
-    raise Exception(f'Something is flawed: {nonce_zero_msb} > {msb}')
+    raise Exception(f'Something is flawed: {nonce_msb} > {msb}')
 
 def inv(s):
     return inverseMod(s, g)
@@ -141,8 +150,8 @@ filename = re.sub(r'\..*', '', basename(rsz_file))
 
 if nonce_zero_msb != None:
     filename += '.nzm' + str(nonce_zero_msb)
-if nonce_share_msb != None:
-    filename += '.nsm' + str(nonce_share_msb)
+if nonce_equal_msb != None:
+    filename += '.nem' + str(nonce_equal_msb)
 if rsz_skip:
     filename += '.skip' + str(rsz_skip)
 
