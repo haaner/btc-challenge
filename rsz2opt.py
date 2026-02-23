@@ -31,6 +31,7 @@ def check_nzmsb_value(value):
 def check_skip_value(value):
     if (ival := int(value)) < 0:
         exit(f'The value {value} must be >= 0.')
+    return ival
 
 def get_arg(args: list, key: str):
     return getattr(args, key.replace('-', '_'))  
@@ -52,6 +53,7 @@ def parse_args():
 
     nequal_msb = get_arg(args, NEMSB) # args.nonce_equal_msb 
     nzero_msb = get_arg(args, NZMSB) # args.nonce_zero_msb
+    skip = get_arg(args, SKIP) 
 
     if nequal_msb == None:
         if nzero_msb == None:
@@ -72,7 +74,7 @@ def parse_args():
     else:
         nonce_max = pow(2, 256 - nzero_msb) - 1
 
-    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, args.skip)
+    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, skip)
 
 msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     1: 300,
