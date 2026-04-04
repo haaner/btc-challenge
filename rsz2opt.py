@@ -114,12 +114,14 @@ msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
 (rsz_file, nonce_zero_msb, nonce_max, nonce_equal_msb, nonce_diff_max, rsz_skip) = parse_args()
 
 rsz_tuples = []
+skip = rsz_skip
 
 for line in open(rsz_file):
     (r, s, z) = [ int(x) for x in line.split() ] 
 
-    if rsz_skip > 0:
-        rsz_skip -= 1
+
+    if skip > 0:
+        skip -= 1
         continue
 
     rsz_tuples.append([ r, s, z ])
