@@ -4,6 +4,8 @@
 *.tmp
 *.pdf
 *.rsz
+*.opt
+*.sol
 data/
 .venv/
 __pycache__
