@@ -57,7 +57,7 @@ def parse_args():
 
     if nequal_msb == None:
         if nzero_msb == None:
-             exit(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space! 3 bits seems to be a good choice assuming your rsz-file contains enough rsz-tuples.')
+            print(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space! 3 bits seems to be a good choice assuming your rsz-file contains enough rsz-tuples.')
 
         nonce_diff_max = None 
     else:   
@@ -143,12 +143,15 @@ def inv(s):
     return inverseMod(s, g)
 
 rsz_n = len(rsz_tuples)
-rsz_needed = get_needed_rsz_count()
 
-if rsz_needed > rsz_n:
-    print(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You should choose lower values for "{NZMSB}" or "{SKIP}"')
-else:
-    rsz_n = rsz_needed
+if nonce_zero_msb is not None or nonce_equal_msb is not None:
+
+    rsz_needed = get_needed_rsz_count()
+
+    if rsz_needed > rsz_n:
+        print(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You should choose lower values for "{NZMSB}" or "{SKIP}"')
+    else:
+        rsz_n = rsz_needed
 
 filename = re.sub(r'\..*', '', basename(rsz_file))
 

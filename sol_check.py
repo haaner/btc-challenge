@@ -71,12 +71,9 @@ if __name__ == '__main__':
     
     print(f'Searching a private key for {utxo = }:')
         
-    sha1 = hashlib.sha1()
-
     x_nds = []
     with open(filepath) as file:
         for line in file:
-            sha1.update(line.encode("utf-8")) 
            
             # get the nonces, d tuple of the solution
             n, d = get_nonces_d(line) 
@@ -110,8 +107,8 @@ if __name__ == '__main__':
         for line in file:
             opt_lines.append(line)    
 
-    opt_lines_first = opt_lines[:-3]    
-    opt_lines_last = opt_lines[-3:]
+    opt_lines_first = opt_lines[:-2]    
+    opt_lines_last = opt_lines[-2:] # TODO: make sure that lx, rx are really there - comments may have been added to the end of the opt-file! 
 
     # Extract lx and rx and get the nonces, d tuple
     lx_n, lx_d = get_nonces_d(opt_lines_last[0])
@@ -122,11 +119,15 @@ if __name__ == '__main__':
     opt_lines_last[0] = vectorize_nonces_d(lx_n, lx_d)
     opt_lines_last[1] = vectorize_nonces_d(rx_n, rx_d)
 
-    opt_lines = opt_lines_first + opt_lines_last
+    opt_lines = ''.join(opt_lines_first) + '\n'.join(opt_lines_last)
+
+    sha1 = hashlib.sha1()
+    
+    sha1.update(opt_lines_last[0].encode("utf-8")) 
+    sha1.update(opt_lines_last[1].encode("utf-8")) 
 
     # Persist the updated opt-file
     f = open(opt_filepath + '.' + sha1.hexdigest() + '.opt', 'w')
 
     print(opt_lines, file=f) 
-    f.close()   
-    
+    f.close() 
