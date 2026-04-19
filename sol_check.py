@@ -40,4 +40,4 @@ if __name__ == '__main__':
                     print(f'The private key {d = } matches the public key {val} ({key})')
                     exit(0)
 
-    print('No private key was found.', end='')
+    print('No private key was found.')
