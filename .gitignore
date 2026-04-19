@@ -8,4 +8,5 @@
 *.sol
 data/
 .venv/
+.vscode/
 __pycache__
