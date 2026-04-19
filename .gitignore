@@ -3,6 +3,7 @@
 *.sig
 *.tmp
 *.pdf
+*.rsz
 data/
 .venv/
 __pycache__
