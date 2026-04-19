@@ -16,42 +16,43 @@ def vectorize_nonces_d(nonces: list[int], d: int) -> str:
     return '[ ' + ' '.join(str(x) for x in nonces + [ d ]) + ' ]'          
 
 def adapt_lr_nonce_bounds():
-    min_index = min_diff = None
-    adapt_r = None # which bound has to be adapted
+    while True:
+        min_index = min_diff = None
+        adapt_r = None # which bound has to be adapted
 
-    for x_nd in x_nds:
-        nonces, d = x_nd
+        for x_nd in x_nds:
+            nonces, d = x_nd
 
-        curr_min_index = curr_min_diff = None
-        curr_adapt_r = None # which bound has to be adapted
+            curr_min_index = curr_min_diff = None
+            curr_adapt_r = None # which bound has to be adapted
 
-        for i, n in enumerate(nonces):
-            diff = min(n - lx_n[i], rx_n[i] - n)
-            if diff < 0: # this solution can be skipped it already violates the current bounds
-                curr_min_index = None;
-                break    
-                
-            if curr_min_index is None or diff < curr_min_diff:
-                curr_min_index = i
-                curr_min_diff = diff
+            for i, n in enumerate(nonces):
+                diff = min(n - lx_n[i], rx_n[i] - n)
+                if diff < 0: # this solution can be skipped it already violates the current bounds
+                    curr_min_index = None;
+                    break    
+                    
+                if curr_min_index is None or diff < curr_min_diff:
+                    curr_min_index = i
+                    curr_min_diff = diff
 
-                curr_adapt_r = (rx_n[i] - n) == diff
+                    curr_adapt_r = (rx_n[i] - n) == diff
 
-        if curr_min_index is not None:
-            min_index = curr_min_index
-            min_diff = curr_min_diff
+            if curr_min_index is not None:
+                min_index = curr_min_index
+                min_diff = curr_min_diff
 
-            adapt_r = curr_adapt_r
+                adapt_r = curr_adapt_r
 
-    if min_index is not None:
+        if min_index is None:
+            break
+
         min_diff += 1
 
         if adapt_r:
             rx_n[min_index] -= min_diff
         else:
             lx_n[min_index] += min_diff
-
-        adapt_lr_nonce_bounds()
 
 if __name__ == '__main__':
     
