@@ -1,10 +1,32 @@
 #!/usr/bin/env python
 
+import argparse
 import hashlib
+from os.path import basename, dirname
 
 if __package__:
     from os import sys, path
     sys.path.append(path.dirname(path.abspath(__file__)))
+
+SOL_FILE='sol_file'
+REGEN='regen'
+
+def get_arg(args: list, key: str):
+    return getattr(args, key.replace('-', '_'))  
+
+def parse_args():
+    p = argparse.ArgumentParser(prog=basename(__file__),
+        description='Check if a sol-file contains the private key for the public key represented by the filename.',
+        epilog='Good luck and maybe buy me beer ;)', exit_on_error=True) 
+
+    p.add_argument(SOL_FILE) 
+    p.add_argument('--' + REGEN, action=argparse.BooleanOptionalAction, help="regenerate an opt file with sharpened bounds") 
+
+    try:
+        return p.parse_args()
+
+    except: 
+        exit(1)
 
 def get_nonces_d(xstr: str):
     xstr = re.sub(r' \|.*', '', xstr).strip('[ ]\r\n')
@@ -62,11 +84,10 @@ if __name__ == '__main__':
     import re 
     import os.path
 
-    if len(argv) < 2:
-        print(f'Usage: {argv[0]} data/17Vu7st1U1KwymUKU4jJheHHGRVNqrcfL.sol')
-        exit(1)
+    args = parse_args()
     
-    filepath = argv[1]
+    filepath = get_arg(args, SOL_FILE)
+    regenerate = get_arg(args, REGEN)
 
     utxo = re.sub(r'\..*', '', os.path.basename(filepath))
     
@@ -94,6 +115,9 @@ if __name__ == '__main__':
             x_nds.append((n, d))
      
     print('No private key was found.')
+
+    if not regenerate:
+        exit(0)
 
     # Determine the opt file
     filename_wo_ending = re.sub(r'\.sol', '', os.path.basename(filepath))
