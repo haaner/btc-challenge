@@ -22,11 +22,7 @@ def parse_args():
     p.add_argument(SOL_FILE) 
     p.add_argument('--' + REGEN, action=argparse.BooleanOptionalAction, help="regenerate an opt file with sharpened bounds") 
 
-    try:
-        return p.parse_args()
-
-    except: 
-        exit(1)
+    return p.parse_args()
 
 def get_nonces_d(xstr: str):
     xstr = re.sub(r' \|.*', '', xstr).strip('[ ]\r\n')

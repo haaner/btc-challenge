@@ -13,6 +13,7 @@ import re
 NZMSB='nonce-zero-msb'
 NEMSB='nonce-equal-msb'
 SKIP='skip'
+LIMIT='limit'
 
 def check_msb_value(value):
     if (ival := int(value)) > 255:  
@@ -33,6 +34,14 @@ def check_skip_value(value):
         exit(f'The value {value} must be >= 0.')
     return ival
 
+def check_limit_value(value):
+    if value is None:
+        return None
+    
+    if (ival := int(value)) <= 0:
+        exit(f'The value {value} must be > 0.')
+    return ival
+
 def get_arg(args: list, key: str):
     return getattr(args, key.replace('-', '_'))  
 
@@ -48,12 +57,13 @@ def parse_args():
     parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
     parser.add_argument('--' + NEMSB, type=check_msb_value, help='The number of consecutive most significant bits that are equal among all nonces.') 
     parser.add_argument('--' + SKIP, default=0, type=check_skip_value, help='The number of initial rsz entries in the file that should be skipped.') 
-
+    parser.add_argument('--' + LIMIT, default=None, type=check_limit_value, help='The maximum number of the rsz entries which should get used.') 
     args = parser.parse_args()
 
     nequal_msb = get_arg(args, NEMSB) # args.nonce_equal_msb 
     nzero_msb = get_arg(args, NZMSB) # args.nonce_zero_msb
     skip = get_arg(args, SKIP) 
+    limit = get_arg(args, LIMIT)
 
     if nequal_msb == None:
         if nzero_msb == None:
@@ -74,7 +84,7 @@ def parse_args():
     else:
         nonce_max = pow(2, 256 - nzero_msb) - 1
 
-    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, skip)
+    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, skip, limit)
 
 msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     1: 300,
@@ -111,14 +121,13 @@ msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     128: 2
 }
 
-(rsz_file, nonce_zero_msb, nonce_max, nonce_equal_msb, nonce_diff_max, rsz_skip) = parse_args()
+(rsz_file, nonce_zero_msb, nonce_max, nonce_equal_msb, nonce_diff_max, rsz_skip, rsz_limit) = parse_args()
 
 rsz_tuples = []
 skip = rsz_skip
 
 for line in open(rsz_file):
     (r, s, z) = [ int(x) for x in line.split() ] 
-
 
     if skip > 0:
         skip -= 1
@@ -148,8 +157,11 @@ if nonce_zero_msb is not None or nonce_equal_msb is not None:
 
     rsz_needed = get_needed_rsz_count()
 
+    if rsz_limit and rsz_limit < rsz_n:
+        rsz_n = rsz_limit
+
     if rsz_needed > rsz_n:
-        print(f'You have too few rsz tuples {rsz_n} < {rsz_needed}! You should choose lower values for "{NZMSB}" or "{SKIP}"')
+        print(f'The amount of the selected / available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or / and increase the values of "{NZMSB}", "{NEMSB}", "{LIMIT}".')
     else:
         rsz_n = rsz_needed
 
@@ -159,8 +171,11 @@ if nonce_zero_msb != None:
     filename += '.nzm' + str(nonce_zero_msb)
 if nonce_equal_msb != None:
     filename += '.nem' + str(nonce_equal_msb)
+
 if rsz_skip:
     filename += '.skip' + str(rsz_skip)
+if rsz_limit:
+    filename += '.n' + str(rsz_limit)
 
 directory = dirname(rsz_file)
 
