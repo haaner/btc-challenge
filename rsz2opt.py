@@ -67,7 +67,7 @@ def parse_args():
 
     if nequal_msb == None:
         if nzero_msb == None:
-            print(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space! 3 bits seems to be a good choice assuming your rsz-file contains enough rsz-tuples.')
+            print(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space!')
 
         nonce_diff_max = None 
     else:   
@@ -161,7 +161,7 @@ if nonce_zero_msb is not None or nonce_equal_msb is not None:
         rsz_n = rsz_limit
 
     if rsz_needed > rsz_n:
-        print(f'The amount of the selected / available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or / and increase the values of "{NZMSB}", "{NEMSB}", "{LIMIT}".')
+        print(f'The amount of the available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or increase the values of "{NZMSB}", "{NEMSB}", "{LIMIT}".')
     else:
         rsz_n = rsz_needed
 
