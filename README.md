@@ -42,7 +42,7 @@ https://www.0ptx.de/download
 
 In case 0ptX finds solutions you first have to decrypt the generated csol-file in order to get a sol file, which is needed for the final step - see here for details on decryption: https://www.0ptx.de/lizenz
 
-### Check the private keys in a (0ptX-generated) sol file against an utxo
+### Check the private keys in a (0ptX-generated) sol file against an UTXO
 ```
 ./sol_check.py 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.nzm3.sol
 ```
