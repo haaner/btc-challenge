@@ -226,8 +226,7 @@ class Btc:
 
         return bytes
 
-    def privateWifKeyToHex(privkey_wif: str) -> str:
-
+    def privateWifKeyToHex(privkey_wif: str) -> list:
         privkey_wif_uncompressed = Btc.uncompressPrivateKey(privkey_wif)
 
         privkey_hex = codecs.encode(base58.b58decode(privkey_wif_uncompressed), 'hex')
@@ -238,6 +237,21 @@ class Btc:
         privkey_hex_str = privkey_hex_str[2:-8] # remove net identifier and checksum  
 
         return for_testnet, privkey_hex_str 
+    
+    def privateIntKeyToWif(privkey_int: int, compress: bool = True, for_testnet: bool = False) -> str:
+        privkey_hex = hex(privkey_int)[2:]
+        return Btc.privateHexKeyToWif(privkey_hex, compress, for_testnet)
+    
+    def privateIntKeyToHex(privkey_int: int, for_testnet: bool = False) -> str:
+        privkey_wif = Btc.privateIntKeyToWif(privkey_int, False, for_testnet)
+        return Btc.privateWifKeyToHex(privkey_wif)
+    
+    def privateHexKeyToInt(privkey: str) -> str:
+        if len(privkey) == 66: # hex key with network identifier
+            privkey = privkey[2:]
+        
+        privkey_int = int(privkey, 16)         
+        return privkey_int
 
     def privateKeyToPublicKeyAddresses(privkey: str) -> dict:
         for_testnet = False
@@ -277,22 +291,21 @@ class Btc:
 ####################################################################################
 
 if __name__ == '__main__':
-    
+  
     for private_hex_key in [ 
         'efDBFF11E0F2F1AA5089465A591C5E523D1CA92668DED893155CDFABC94CC14E30', # ef -> testnet
         'ef26F85CE8B2C635AD92F6148E4443FE415F512F3F29F44AB0E2CBDA819295BBD5',
         'efD9172189D7700FDFB4B6A5C4A83990EAEAFE455441B7D43FF85678EB93AC2713',
         'L2BYcYFgqjBtWASZyC7oScc7tdtBytZXvF6NGzmTRUupMiCMCrpC',
         'L3515Af6HhtTBfSoQPeV9uQEBgnUdsR3x8fcEuQXiQmiYZz5SnhD',
-        'L1Sk5hZMw2XU5axBRrtQSR3A7zdJtSjRP33x8crmEJAPpL196rtf',
         '5KhW6aAcyTjTvzvVSgnkd1P1q2BLWXg1jtK1U124sknzxNTbxHm',
         '5JEcrcmtJd3D187VdDaxpqmMTGBWH1HtWmiN7KTuqcf4KZrBwy4',
-        '5JZm8bScnYZrD1rV5uZHG4hvPcnpW43R9z9vBBmPxe8b5PDb4rC'
+        '5JZm8bScnYZrD1rV5uZHG4hvPcnpW43R9z9vBBmPxe8b5PDb4rC',
+        'L1Sk5hZMw2XU5axBRrtQSR3A7zdJtSjRP33x8crmEJAPpL196rtf',
+        '807e0dd9f1fb3c11c0b7b555b7f9115d63361283b4073472fa4055f2d765344113' # 80 -> mainnet
     ]:
         print(Btc.privateKeyToPublicKeyAddresses(private_hex_key))
 
-    print()
-      
     if Btc.bechToHash160('bc1qpdnwhl8zfjpy5jfm2zssjqrdpje83ntgl5j00c') != Btc.wifToHash160('123HjFA4jzEJY6t46A4otSTgZLUVv5vp7g'):
         print("The wif / bech hashes mismatch!") 
 
