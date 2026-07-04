@@ -148,7 +148,10 @@ class Secp256k1(EllipticCurve):
                          0, 7, 
                          Point(0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
                          0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
-      
+        
+    def inv(self, s: int): 
+        return inverseMod(s, self.n)
+
 secp = Secp256k1()
       
 if __name__ == '__main__':
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     
     print('\nMultiplication is commutative:', abG == baG)
 
-    a_inv = inverseMod(a, secp.n)
+    a_inv = secp.inv(a)
     bG_recover = secp.mult(a_inv, abG)
   
     print("\na_inv abG:\t\t", bG_recover)

@@ -6,7 +6,7 @@ if __package__:
 
 import argparse
 from sys import argv, stdin, exit
-from lib.secp256k1 import inverseMod, secp
+from lib.secp256k1 import secp
 from os.path import basename, dirname
 import re 
 
@@ -148,9 +148,6 @@ def get_needed_rsz_count():
         
     raise Exception(f'Something is flawed: {nonce_msb} > {msb}')
 
-def inv(s):
-    return inverseMod(s, g)
-
 rsz_n = len(rsz_tuples)
 
 if nonce_zero_msb is not None or nonce_equal_msb is not None:
@@ -199,7 +196,7 @@ for rsz in rsz_tuples:
     print('[', end = ' ', file=f)
     (r, s, z) = rsz
 
-    s_inv = inv(s)
+    s_inv = secp.inv(s)
 
     for j in range(rsz_n + 1):
         if i == j:
