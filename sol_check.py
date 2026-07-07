@@ -113,7 +113,7 @@ if __name__ == '__main__':
     print('No private key was found.')
 
     if not regenerate:
-        exit(0)
+        exit(1)
 
     # Determine the opt file
     filename_wo_ending = re.sub(r'\.sol', '', os.path.basename(filepath))
@@ -152,3 +152,5 @@ if __name__ == '__main__':
 
     print(opt_lines, file=f) 
     f.close() 
+
+    exit(1) 
