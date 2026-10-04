@@ -10,8 +10,11 @@ from lib.secp256k1 import secp
 from os.path import basename, dirname
 import re 
 
-NZMSB='nonce-zero-msb'
 NEMSB='nonce-equal-msb'
+NZMSB='nonce-zero-msb'
+
+KZMSB='key-zero-msb'
+
 SKIP='skip'
 LIMIT='limit'
 
@@ -23,11 +26,15 @@ def check_msb_value(value):
 
     return ival
 
-def check_nzmsb_value(value):
+def check_zmsb_value(param, value):
     if (ival := check_msb_value(value)) < 3:
-        print(f'Using {NZMSB} values < 3 will probably not work!')
+        print(f'Using {param} values < 3 will probably not work!')
 
-    return ival
+def check_nzmsb_value(value):
+    return check_zmsb_value(NZMSB, value)
+
+def check_kzmsb_value(value):
+    return check_zmsb_value(KZMSB, value)
 
 def check_skip_value(value):
     if (ival := int(value)) < 0:
@@ -53,21 +60,28 @@ def parse_args():
         description='Generate opt-data from rsz-data',
         epilog='0ptX may solve your problem(s) - www.0ptX.de', exit_on_error=True) 
 
-    parser.add_argument('rsz_file') 
-    parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
+    parser.add_argument('rsz_file')
+
     parser.add_argument('--' + NEMSB, type=check_msb_value, help='The number of consecutive most significant bits that are equal among all nonces.') 
+    parser.add_argument('--' + NZMSB, type=check_nzmsb_value, help='The number of consecutive most significant bits that are zero in all nonces.') 
+
+    parser.add_argument('--' + KZMSB, type=check_kzmsb_value, help='The number of consecutive most significant bits that are zero in the private key.')  
+    
     parser.add_argument('--' + SKIP, default=0, type=check_skip_value, help='The number of initial rsz entries in the file that should be skipped.') 
     parser.add_argument('--' + LIMIT, default=None, type=check_limit_value, help='The maximum number of the rsz entries which should get used.') 
     args = parser.parse_args()
 
     nequal_msb = get_arg(args, NEMSB) # args.nonce_equal_msb 
     nzero_msb = get_arg(args, NZMSB) # args.nonce_zero_msb
+    
+    kzero_msb = get_arg(args, KZMSB)
+    
     skip = get_arg(args, SKIP) 
     limit = get_arg(args, LIMIT)
 
     if nequal_msb == None:
-        if nzero_msb == None:
-            print(f'You should either set "{NZMSB}" or "{NEMSB}", otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space!')
+        if nzero_msb == None and kzero_msb == None:
+            print(f'You should either set "{NEMSB}", "{NZMSB}" or "{KZMSB}" otherwise the resulting opt problem is trivial to solve and would not narrow the private key search space!')
 
         nonce_diff_max = None 
     else:   
@@ -84,7 +98,12 @@ def parse_args():
     else:
         nonce_max = pow(2, 256 - nzero_msb) - 1
 
-    return (args.rsz_file, nzero_msb, nonce_max, nequal_msb, nonce_diff_max, skip, limit)
+    if kzero_msb == None:
+        kzero_max = g - 1
+    else:
+        kzero_max = pow(2, 256 - kzero_msb) - 1
+
+    return (args.rsz_file, nequal_msb, nonce_diff_max, nzero_msb, nonce_max, kzero_msb, kzero_max, skip, limit)
 
 msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     1: 300,
@@ -121,7 +140,7 @@ msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     128: 2
 }
 
-(rsz_file, nonce_zero_msb, nonce_max, nonce_equal_msb, nonce_diff_max, rsz_skip, rsz_limit) = parse_args()
+(rsz_file, nonce_equal_msb, nonce_diff_max, key_zero_msb, nonce_zero_msb, nonce_max, key_max, rsz_skip, rsz_limit) = parse_args()
 
 rsz_tuples = []
 skip = rsz_skip
@@ -137,20 +156,29 @@ for line in open(rsz_file):
 
 def get_needed_rsz_count():
 
-    nzm = 256 if nonce_zero_msb is None else nonce_zero_msb
+    if nonce_zero_msb is None:
+        zero_msb = key_zero_msb
+    elif key_zero_msb is None:
+        zero_msb = nonce_zero_msb
+    elif key_zero_msb < nonce_zero_msb:
+        zero_msb = nonce_zero_msb
+    else:
+        zero_msb = key_zero_msb
+
+    zm = 256 if zero_msb is None else zero_msb
     nem = 256 if nonce_equal_msb is None else nonce_equal_msb
     
-    nonce_msb = nzm if nzm < nem else nem
+    msb_ref = zm if zm < nem else nem
 
     for msb, n in msb_n.items():
-        if nonce_msb <= msb:
+        if msb_ref <= msb:
             return n
         
-    raise Exception(f'Something is flawed: {nonce_msb} > {msb}')
+    raise Exception(f'Something is flawed: {msb_ref} > {msb}')
 
 rsz_n = len(rsz_tuples)
 
-if nonce_zero_msb is not None or nonce_equal_msb is not None:
+if nonce_equal_msb is not None or nonce_zero_msb is not None or key_zero_msb is not None:
 
     rsz_needed = get_needed_rsz_count()
 
@@ -158,16 +186,19 @@ if nonce_zero_msb is not None or nonce_equal_msb is not None:
         rsz_n = rsz_limit
 
     if rsz_needed > rsz_n:
-        print(f'The amount of the available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or increase the values of "{NZMSB}", "{NEMSB}", "{LIMIT}".')
+        print(f'The amount of the available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or increase the values of "{NEMSB}", "{NZMSB}", "{KZMSB}", "{LIMIT}".')
     else:
         rsz_n = rsz_needed
 
 filename = re.sub(r'\..*', '', basename(rsz_file))
 
-if nonce_zero_msb != None:
-    filename += '.nzm' + str(nonce_zero_msb)
 if nonce_equal_msb != None:
     filename += '.nem' + str(nonce_equal_msb)
+if nonce_zero_msb != None:
+    filename += '.nzm' + str(nonce_zero_msb)
+
+if key_zero_msb != None:
+    filename += '.kzm' + str(key_zero_msb)
 
 if rsz_skip:
     filename += '.skip' + str(rsz_skip)
@@ -264,7 +295,7 @@ print(']', file=f)
 
 # solution: upper bound section
 upper = [ nonce_max for j in range(0, rsz_n) ] # the max values for the nonces
-upper.append(g-1) # the max value for the private key
+upper.append(key_max) # the max value for the private key
 
 print('[', *upper, sep=' ', end=" ]\n", file=f)
 

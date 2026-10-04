@@ -25,8 +25,9 @@ pip install -r requirements.txt
 
 ### Create opt-data from a rsz
 ```
-./rsz2opt.py --nonce-zero-msb=3 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
 ./rsz2opt.py --nonce-equal-msb=1 --nonce-zero-msb=3 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
+./rsz2opt.py --nonce-zero-msb=3 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
+./rsz2opt.py --key-zero-msb=3 18p3G8gQ3oKy4U9EqnWs7UZswdqAMhE3r8.rsz
 ```
 
 ### Download a copy of 0ptX
