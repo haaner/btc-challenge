@@ -23,12 +23,12 @@ def check_msb_value(value):
         exit(f'The value {value} must be smaller than 256.')
     if ival < 1:
         exit(f'The value {value} must be greater than 0.')
-
     return ival
 
 def check_zmsb_value(param, value):
     if (ival := check_msb_value(value)) < 3:
         print(f'Using {param} values < 3 will probably not work!')
+    return ival
 
 def check_nzmsb_value(value):
     return check_zmsb_value(NZMSB, value)
@@ -140,7 +140,7 @@ msb_n = { # see https://eprint.iacr.org/2019/023.pdf (Biased Nonce Sense)
     128: 2
 }
 
-(rsz_file, nonce_equal_msb, nonce_diff_max, key_zero_msb, nonce_zero_msb, nonce_max, key_max, rsz_skip, rsz_limit) = parse_args()
+(rsz_file, nonce_equal_msb, nonce_diff_max, nonce_zero_msb, nonce_max, key_zero_msb, key_max, rsz_skip, rsz_limit) = parse_args()
 
 rsz_tuples = []
 skip = rsz_skip
@@ -301,4 +301,4 @@ print('[', *upper, sep=' ', end=" ]\n", file=f)
 
 f.close()
 
-print (f'{filename} has been written.')
+print(f'{filename} has been written.')
