@@ -154,21 +154,12 @@ for line in open(rsz_file):
 
     rsz_tuples.append([ r, s, z ])
 
-def get_needed_rsz_count():
+def get_needed_nonce_rsz_count():
 
-    if nonce_zero_msb is None:
-        zero_msb = key_zero_msb
-    elif key_zero_msb is None:
-        zero_msb = nonce_zero_msb
-    elif key_zero_msb < nonce_zero_msb:
-        zero_msb = nonce_zero_msb
-    else:
-        zero_msb = key_zero_msb
-
-    zm = 256 if zero_msb is None else zero_msb
+    nzm = 256 if nonce_zero_msb is None else nonce_zero_msb
     nem = 256 if nonce_equal_msb is None else nonce_equal_msb
     
-    msb_ref = zm if zm < nem else nem
+    msb_ref = nzm if nzm < nem else nem
 
     for msb, n in msb_n.items():
         if msb_ref <= msb:
@@ -178,12 +169,12 @@ def get_needed_rsz_count():
 
 rsz_n = len(rsz_tuples)
 
-if nonce_equal_msb is not None or nonce_zero_msb is not None or key_zero_msb is not None:
+if rsz_limit and rsz_limit < rsz_n:
+    rsz_n = rsz_limit
 
-    rsz_needed = get_needed_rsz_count()
+if nonce_equal_msb is not None or nonce_zero_msb is not None:
 
-    if rsz_limit and rsz_limit < rsz_n:
-        rsz_n = rsz_limit
+    rsz_needed = get_needed_nonce_rsz_count()
 
     if rsz_needed > rsz_n:
         print(f'The amount of the available rsz tuples ist too small ({rsz_n} < {rsz_needed}). You should either decrease the value of "{SKIP}" or increase the values of "{NEMSB}", "{NZMSB}", "{KZMSB}", "{LIMIT}".')
